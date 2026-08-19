@@ -313,6 +313,7 @@ static void update_player(game_t *g, float dt, const game_input_t *in)
 
     p->sprinting = (mag >= SPRINT_THRESHOLD);
     const float speed = PLAYER_MAX_SPEED * powf(mag, PLAYER_SPEED_CURVE);
+    p->speed = speed;
 
     if (mag > 0.05f) {
         const float ux = in->mx / (mag > 0.0001f ? mag : 1.0f);

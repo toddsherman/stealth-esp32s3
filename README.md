@@ -19,9 +19,15 @@ walls — a bomb thrown down a side corridor genuinely pulls guards away from
 the door they were watching.
 
 Detection is a meter, not a trigger. Being clipped by the edge of a cone for a
-moment is survivable; standing in the middle of one is not — and you can hear
-it happening before you can read it, because the heartbeat's rate and volume
-both track the closest guard's certainty.
+moment is survivable; standing in the middle of one is not. The meter climbs
+two columns up the left and right edges of the screen — when they reach the
+top you have been identified — so it reads in peripheral vision without
+looking away from the guard about to see you. You can hear it happening too:
+the heartbeat's rate and volume both track the closest guard's certainty.
+
+Once you *are* seen, running is not an escape. A chasing guard moves at least
+as fast as you are currently moving, so the only way out is to break line of
+sight.
 
 ## Controls
 
@@ -59,9 +65,18 @@ source ~/esp/esp-idf/export.sh && idf.py -B /tmp/stealth-build -p /dev/cu.usbmod
 ## Sound
 
 There are no audio samples in flash — everything is synthesised live by
-[`main/synth.c`](main/synth.c) into the ES8311 codec at 22.05kHz mono. The
-heartbeat is two thumps (a loud "lub", a softer "dub" 30% of a cycle later),
-ramping from 52 to 168 BPM as tension climbs.
+[`main/synth.c`](main/synth.c) into the ES8311 codec at 22.05kHz mono.
+
+- **Heartbeat** — two thumps (a loud "lub", a softer "dub" 30% of a cycle
+  later), ramping from 52 to 168 BPM as tension climbs.
+- **Music bed** — a slow unresolved drone in D minor at 76 BPM, with a sparse
+  pulse on the bar and an occasional bell. A minor second fades into the drone
+  *only* as tension rises, which is where the unease comes from. It peaks at
+  14% of full scale: it raises the floor, it does not ask to be listened to.
+
+The inner loop uses a 1024-entry sine table and multiplicative envelopes
+rather than `sinf`/`expf` per sample, which is what leaves room for a
+continuous music bed under the one-shot effects.
 
 `synth.c` deliberately has no platform dependencies, so the exact code driving
 the speaker can be rendered to a WAV and inspected without hardware:
@@ -117,7 +132,7 @@ hostages), measured on device:
 
 | | |
 |---|---|
-| Framerate | **35–38 FPS** (26ms/frame) |
+| Framerate | **34–38 FPS** (26–29ms/frame, with audio running) |
 | Cone raycasting | 1.3 ms |
 | Rasterising (14 bands) | 15.5 ms |
 | QSPI DMA | 9.5 ms |

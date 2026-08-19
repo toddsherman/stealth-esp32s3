@@ -30,6 +30,7 @@ void synth_init(uint32_t sample_rate);
 void synth_sfx(sfx_t sfx);
 void synth_set_tension(float tension);          // 0..1
 void synth_set_heartbeat_enabled(bool enabled);
+void synth_set_music_enabled(bool enabled);     // slow tense bed, fades in/out
 
 // Renders `frames` mono 16-bit samples. Drives the heartbeat clock, so it must
 // be called continuously for timing to stay correct.

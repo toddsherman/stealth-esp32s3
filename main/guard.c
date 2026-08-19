@@ -189,9 +189,15 @@ void guard_update(game_t *g, guard_t *gd, float dt)
     }
 
     switch (gd->mode) {
-    case GM_CHASE:
-        seek(g, gd, gd->ix, gd->iy, GUARD_CHASE_SPD, dt);
+    case GM_CHASE: {
+        // Once you have been seen, speed alone will not save you: a chasing
+        // guard moves at least as fast as you are currently moving. Breaking
+        // line of sight is the only way out.
+        float sp = GUARD_CHASE_SPD;
+        if (g->player.speed > sp) sp = g->player.speed;
+        seek(g, gd, gd->ix, gd->iy, sp, dt);
         break;
+    }
 
     case GM_INVESTIGATE:
         if (seek(g, gd, gd->ix, gd->iy, GUARD_INVEST_SPD, dt)) {

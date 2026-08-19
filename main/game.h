@@ -41,7 +41,7 @@ extern "C" {
 #define GUARD_R           6.0f
 #define GUARD_PATROL_SPD  34.0f
 #define GUARD_INVEST_SPD  58.0f
-#define GUARD_CHASE_SPD   66.0f
+#define GUARD_CHASE_SPD   66.0f       // floor; a chase matches your real speed
 #define GUARD_TURN_RATE   4.5f        // rad/s
 #define GUARD_FOV         1.20f       // radians, total cone angle (~69 deg)
 #define GUARD_RANGE       110.0f      // px
@@ -116,6 +116,7 @@ typedef enum { GM_PATROL, GM_INVESTIGATE, GM_LOOK, GM_CHASE } guard_mode_t;
 
 typedef struct {
     float x, y;
+    float speed;       // current px/s, published so a chase can match it
     float noise_t;
     bool  sprinting;
 } player_t;

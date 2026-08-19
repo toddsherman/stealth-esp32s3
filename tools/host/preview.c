@@ -131,6 +131,19 @@ int main(int argc, char **argv)
     }
     sim(&g, 0.2f, NULL);
 
+    // --- alert columns: stand in front of the guard and let it build ---
+    game_load_level(&g, 0);
+    tap(&g, 184, 300);
+    sim(&g, 0.3f, NULL);
+    g.player.x = g.guards[0].x + 46.0f;    // squarely inside the cone
+    g.player.y = g.guards[0].y;
+    sim(&g, 0.55f, NULL);
+    render_to_fb(&g);
+    snprintf(path, sizeof(path), "%s/08_alert.ppm", outdir);
+    write_ppm(path);
+    printf("alert after 0.55s in cone: %.2f (phase=%d)\n",
+           (double)g.max_alert, (int)g.phase);
+
     // --- level 6: the busiest board ---
     game_load_level(&g, g_level_count - 1);
     tap(&g, 184, 300);

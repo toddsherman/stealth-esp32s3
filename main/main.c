@@ -144,6 +144,10 @@ void app_main(void)
         // The heartbeat tracks the closest guard's certainty, and only while
         // the level is actually being played.
         audio_set_heartbeat_enabled(game.phase == GS_PLAY);
+        // Music runs through the menus and the level itself, but drops away
+        // for the result screens so their stings land in the clear.
+        audio_set_music_enabled(game.phase == GS_TITLE || game.phase == GS_BRIEF ||
+                                game.phase == GS_PLAY);
         audio_set_tension(game.max_alert);
 
         game_render_prepare(&game);

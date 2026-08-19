@@ -97,7 +97,7 @@ void hud_build_input(game_input_t *in, const touch_state_t *ts,
 // makes an off-centre neutral obvious instead of mysterious.
 static void draw_tilt_bubble(gfx_surf_t *s, const game_t *g)
 {
-    const int cx = 108, cy = HUD_Y + HUD_H / 2, r = 17;
+    const int cx = 196, cy = HUD_Y + HUD_H / 2, r = 17;
 
     gfx_ring(s, cx, cy, r, 1, COL_TEXT_DIM, 14);
     gfx_fill_rect(s, cx - 2, cy, 5, 1, COL_TEXT_DIM);
@@ -128,6 +128,45 @@ static void draw_toast(gfx_surf_t *s)
     gfx_text_centered(s, PLAY_W / 2, PLAY_H - 26, "LEVELLED", COL_PLAYER, 1);
 }
 
+// The alert meter lives in your peripheral vision rather than in the HUD:
+// two columns climb the left and right edges of the play area, and the moment
+// they reach the top you have been identified. It reads without looking away
+// from the guard that is about to see you.
+#define ALERT_COL_W 7
+
+static void draw_alert_columns(gfx_surf_t *s, const game_t *g)
+{
+    if (g->phase != GS_PLAY && g->phase != GS_CAUGHT) return;
+
+    const float a = g->max_alert;
+    if (a <= 0.001f) return;
+
+    int h = (int)(a * (float)PLAY_H + 0.5f);
+    if (h < 2) h = 2;
+    const int y = PLAY_H - h;
+
+    const bool  critical = (a > 0.75f);
+    const uint16_t col = critical ? COL_WHITE : COL_ALERT;
+
+    // Body fades in as the meter climbs, so a glancing contact is a hint and
+    // a sustained one is impossible to ignore.
+    const uint32_t body = (uint32_t)(5.0f + a * 16.0f);
+    gfx_blend_rect(s, 0, y, ALERT_COL_W, h, col, body);
+    gfx_blend_rect(s, PLAY_W - ALERT_COL_W, y, ALERT_COL_W, h, col, body);
+
+    // A brighter leading edge makes the exact level readable at a glance.
+    gfx_blend_rect(s, 0, y, ALERT_COL_W, 2, col, GFX_ALPHA_MAX);
+    gfx_blend_rect(s, PLAY_W - ALERT_COL_W, y, ALERT_COL_W, 2, col, GFX_ALPHA_MAX);
+
+    // Near the top the whole column throbs.
+    if (critical) {
+        const float p = 0.5f + 0.5f * sinf(g->level_time * 16.0f);
+        const uint32_t flare = (uint32_t)(6.0f + p * 12.0f);
+        gfx_blend_rect(s, 0, y, ALERT_COL_W + 3, h, COL_ALERT, flare);
+        gfx_blend_rect(s, PLAY_W - ALERT_COL_W - 3, y, ALERT_COL_W + 3, h, COL_ALERT, flare);
+    }
+}
+
 static void draw_reveal_label(gfx_surf_t *s, const game_t *g)
 {
     if (!g->reveal_paths) return;
@@ -136,6 +175,7 @@ static void draw_reveal_label(gfx_surf_t *s, const game_t *g)
 
 void hud_render(gfx_surf_t *s, const game_t *g)
 {
+    draw_alert_columns(s, g);
     draw_aim(s, g);
     draw_toast(s);
     draw_reveal_label(s, g);
@@ -161,16 +201,6 @@ void hud_render(gfx_surf_t *s, const game_t *g)
     }
 
     draw_tilt_bubble(s, g);
-
-    // --- middle: alert meter, the one number that decides the run ---
-    const int bx = 152, by = HUD_Y + 26, bw = 128, bh = 6;
-    gfx_text(s, bx, HUD_Y + 8, "ALERT", COL_TEXT_DIM, 1);
-    gfx_fill_rect(s, bx, by, bw, bh, RGB565(28, 22, 26));
-    if (g->max_alert > 0.0f) {
-        gfx_fill_rect(s, bx, by, (int)(bw * g->max_alert), bh,
-                      g->max_alert > 0.7f ? COL_WHITE : COL_ALERT);
-    }
-    gfx_rect_frame(s, bx - 1, by - 1, bw + 2, bh + 2, 1, RGB565(48, 40, 46));
 
     // --- right: bomb button ---
     const bool usable = (g->bombs_left > 0) && !g->bomb.active;

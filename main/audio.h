@@ -24,6 +24,9 @@ void audio_set_tension(float tension);
 // Silences the heartbeat without touching one-shot effects (menus, results).
 void audio_set_heartbeat_enabled(bool enabled);
 
+// The tense music bed. Fades rather than cutting, so toggling per phase is fine.
+void audio_set_music_enabled(bool enabled);
+
 void audio_sfx(sfx_t sfx);
 
 #ifdef __cplusplus

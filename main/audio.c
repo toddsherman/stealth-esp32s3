@@ -32,6 +32,7 @@ static bool                   s_ok;
 
 void audio_set_tension(float t)            { synth_set_tension(t); }
 void audio_set_heartbeat_enabled(bool e)   { synth_set_heartbeat_enabled(e); }
+void audio_set_music_enabled(bool e)       { synth_set_music_enabled(e); }
 void audio_sfx(sfx_t sfx)                  { if (s_ok) synth_sfx(sfx); }
 bool audio_present(void)                   { return s_ok; }
 

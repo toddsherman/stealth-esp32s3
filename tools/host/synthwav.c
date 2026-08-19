@@ -25,10 +25,18 @@ int main(int argc, char **argv)
     const long data_start = ftell(f);
 
     synth_init(RATE);
+    synth_set_music_enabled(true);
     int16_t buf[FRAMES];
     long total = 0;
 
-    // 1) Heartbeat: tension ramps 0 -> 1 over 10 seconds.
+    // 0) Music bed alone for 12s, so the drone and pulse can be heard clean.
+    const int bed_blocks = (12 * RATE) / FRAMES;
+    for (int i = 0; i < bed_blocks; i++) {
+        synth_render(buf, FRAMES);
+        fwrite(buf, 2, FRAMES, f); total += FRAMES;
+    }
+
+    // 1) Heartbeat over the bed: tension ramps 0 -> 1 over 10 seconds.
     const int ramp_blocks = (10 * RATE) / FRAMES;
     for (int i = 0; i < ramp_blocks; i++) {
         synth_set_tension((float)i / (float)ramp_blocks);
