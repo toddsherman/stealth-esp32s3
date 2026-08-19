@@ -58,6 +58,11 @@ void gfx_ring        (gfx_surf_t *s, int cx, int cy, int r, int t, uint16_t c, u
 void gfx_line      (gfx_surf_t *s, int x0, int y0, int x1, int y1, uint16_t c);
 void gfx_line_thick(gfx_surf_t *s, int x0, int y0, int x1, int y1, int t, uint16_t c);
 
+// Alpha-blended 1px polyline. Each pixel is blended exactly once, including
+// the vertices shared between segments - blending segments independently
+// would double-blend every joint and turn a faint line into a dotted one.
+void gfx_polyline_a(gfx_surf_t *s, const gfx_pt_t *pts, int n, uint16_t c, uint32_t a);
+
 // Even-odd scanline fill of an arbitrary simple polygon. Used for vision
 // cones, which are star-shaped but go concave wherever a wall bites into them.
 void gfx_blend_poly(gfx_surf_t *s, const gfx_pt_t *pts, int n, uint16_t c, uint32_t a);

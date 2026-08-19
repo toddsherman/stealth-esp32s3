@@ -112,28 +112,26 @@ static void build_routes(const game_t *g)
     }
 }
 
-// Deliberately faint: a hint you can read while held, not a second HUD.
+// One continuous hairline along the whole route. Deliberately faint: a hint
+// you can read while held, not a second HUD.
+#define COL_ROUTE      RGB565(140, 175, 215)
+#define ROUTE_ALPHA    9      // of 32
+#define ROUTE_END_ALPHA 16
+
 static void draw_routes(gfx_surf_t *s, const game_t *g)
 {
-    static const uint16_t COL_ROUTE = RGB565(120, 150, 190);
-
     for (int i = 0; i < g->guard_count; i++) {
-        for (int k = 0; k + 1 < s_route[i].n; k++) {
-            gfx_blend_rect(s, (int)s_route[i].pts[k].x - 1,
-                              (int)s_route[i].pts[k].y - 1, 3, 3, COL_ROUTE, 5);
-            gfx_line(s, (int)s_route[i].pts[k].x, (int)s_route[i].pts[k].y,
-                        (int)s_route[i].pts[k + 1].x, (int)s_route[i].pts[k + 1].y,
-                        COL_GRID);
-        }
+        if (s_route[i].n < 2) continue;
+        gfx_polyline_a(s, s_route[i].pts, s_route[i].n, COL_ROUTE, ROUTE_ALPHA);
 
-        // Waypoints: where a guard stops, turns and scans - the part worth
-        // knowing when you are planning a crossing.
+        // A small mark where a guard stops, turns and scans - the moment worth
+        // timing a crossing against. Kept smaller than the line is long.
         const guard_def_t *def = g->guards[i].def;
         if (!def) continue;
         for (int w = 0; w < def->wp_count; w++) {
             const int cx = def->wx[w] * TILE + TILE / 2;
             const int cy = def->wy[w] * TILE + TILE / 2;
-            gfx_ring(s, cx, cy, 5, 1, COL_ROUTE, 10);
+            gfx_blend_circle(s, cx, cy, 2, COL_ROUTE, ROUTE_END_ALPHA);
         }
     }
 }

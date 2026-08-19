@@ -152,6 +152,19 @@ int main(int argc, char **argv)
     snprintf(path, sizeof(path), "%s/06_play_l6.ppm", outdir);
     write_ppm(path);
 
+    // --- routes revealed on the busiest board, where they actually wind ---
+    game_load_level(&g, g_level_count - 1);
+    tap(&g, 184, 300);
+    sim(&g, 1.2f, NULL);
+    {
+        touch_state_t ts = { .down = true, .x = 180, .y = 200, .down_x = 180, .down_y = 200 };
+        sim(&g, 0.9f, &ts);
+        render_to_fb(&g);
+        snprintf(path, sizeof(path), "%s/09_routes_l6.ppm", outdir);
+        write_ppm(path);
+    }
+    sim(&g, 0.2f, NULL);
+
     // --- report simulated state, so the harness doubles as a smoke test ---
     printf("levels=%d  final: phase=%d level=%d guards=%d hostages=%d bombs=%d\n",
            g_level_count, (int)g.phase, g.level_idx + 1, g.guard_count,

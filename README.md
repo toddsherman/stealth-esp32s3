@@ -35,7 +35,7 @@ sight.
 |---|---|
 | Move | **Tilt the board.** Speed rises continuously with the angle |
 | Throw a sound bomb | Tap the bomb button, then tap where it should land |
-| Reveal patrol routes | **Press and hold** the map |
+| Reveal patrol routes | **Press and hold** the map — a hairline traces each guard's full circuit |
 | Re-level the tilt neutral | Short tap on the map (when no bomb is armed) |
 | Menus | Tap |
 

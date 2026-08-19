@@ -142,6 +142,40 @@ void gfx_line_thick(gfx_surf_t *s, int x0, int y0, int x1, int y1, int t, uint16
     }
 }
 
+static inline void blend_px(gfx_surf_t *s, int x, int y, uint16_t c, uint32_t a)
+{
+    const int lx = x - s->ox, ly = y - s->oy;
+    if (lx < 0 || lx >= s->w || ly < 0 || ly >= s->h) return;
+    uint16_t *p = &s->px[(size_t)ly * s->stride + lx];
+    *p = gfx_to_dev(gfx_blend(c, gfx_from_dev(*p), a));
+}
+
+void gfx_polyline_a(gfx_surf_t *s, const gfx_pt_t *pts, int n, uint16_t c, uint32_t a)
+{
+    if (n < 2 || a == 0) return;
+
+    bool first = true;
+    for (int i = 0; i + 1 < n; i++) {
+        int x0 = (int)pts[i].x,     y0 = (int)pts[i].y;
+        const int x1 = (int)pts[i + 1].x, y1 = (int)pts[i + 1].y;
+
+        int dx =  abs(x1 - x0), sx = (x0 < x1) ? 1 : -1;
+        int dy = -abs(y1 - y0), sy = (y0 < y1) ? 1 : -1;
+        int err = dx + dy;
+
+        bool skip = !first;   // this vertex was already drawn by the last segment
+        for (;;) {
+            if (!skip) blend_px(s, x0, y0, c, a);
+            skip = false;
+            if (x0 == x1 && y0 == y1) break;
+            const int e2 = 2 * err;
+            if (e2 >= dy) { err += dy; x0 += sx; }
+            if (e2 <= dx) { err += dx; y0 += sy; }
+        }
+        first = false;
+    }
+}
+
 // --- polygon ---------------------------------------------------------------
 
 #define POLY_MAX_X 64
