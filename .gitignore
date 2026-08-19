@@ -1,0 +1,14 @@
+# ESP-IDF build output. The build directory is kept outside the tree
+# (see flash.sh), but ignore the default location too.
+build/
+sdkconfig
+sdkconfig.old
+
+# Pulled from the component registry by idf.py; dependencies.lock pins them.
+managed_components/
+
+# Local previews and scratch renders
+*.ppm
+*.wav
+
+.DS_Store
