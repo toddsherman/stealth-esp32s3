@@ -18,6 +18,10 @@ than radiating in a circle, so it travels around corners but never through
 walls — a bomb thrown down a side corridor genuinely pulls guards away from
 the door they were watching.
 
+The instant a guard resolves you from "something moved" into "someone is
+there", their cone turns hot and an alarm stabs — the same `detecting` flag
+drives both, so the sound always lands on the frame you see the colour change.
+
 Detection is a meter, not a trigger. Being clipped by the edge of a cone for a
 moment is survivable; standing in the middle of one is not. The meter climbs
 two columns up the left and right edges of the screen — when they reach the
@@ -67,6 +71,9 @@ source ~/esp/esp-idf/export.sh && idf.py -B /tmp/stealth-build -p /dev/cu.usbmod
 There are no audio samples in flash — everything is synthesised live by
 [`main/synth.c`](main/synth.c) into the ES8311 codec at 22.05kHz mono.
 
+- **Detection alarm** — the loudest thing in the game, a tritone stab with a
+  noise transient on the front. It fires on the exact frame a guard's cone
+  turns hot, and ducks the music under itself so it punches.
 - **Heartbeat** — two thumps (a loud "lub", a softer "dub" 30% of a cycle
   later), ramping from 52 to 168 BPM as tension climbs.
 - **Music bed** — a slow unresolved drone in D minor at 76 BPM, with a sparse

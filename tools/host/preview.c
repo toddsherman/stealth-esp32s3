@@ -165,6 +165,32 @@ int main(int argc, char **argv)
     }
     sim(&g, 0.2f, NULL);
 
+    // --- integration check: the alarm must fire on the exact frame the cone
+    // --- turns hot, otherwise the audio and the visual have drifted apart.
+    {
+        game_load_level(&g, 0);
+        tap(&g, 184, 300);
+        sim(&g, 0.3f, NULL);
+        g.player.x = g.guards[0].x + 52.0f;      // step into the cone
+        g.player.y = g.guards[0].y;
+
+        const float dt = 1.0f / 60.0f;
+        int hot_frame = -1, event_frame = -1;
+        touch_state_t ts = {0};
+        game_input_t in = {0};
+
+        for (int f = 0; f < 240; f++) {
+            hud_build_input(&in, &ts, 0.0f, 0.0f, &g, dt);
+            game_update(&g, dt, &in);
+            if (hot_frame < 0 && g.guards[0].detecting) hot_frame = f;
+            if (event_frame < 0 && (g.events & EV_DETECT)) event_frame = f;
+            if (hot_frame >= 0 && event_frame >= 0) break;
+        }
+        printf("detect sync: cone hot on frame %d, EV_DETECT on frame %d -> %s\n",
+               hot_frame, event_frame,
+               (hot_frame >= 0 && hot_frame == event_frame) ? "IN SYNC" : "DRIFTED");
+    }
+
     // --- report simulated state, so the harness doubles as a smoke test ---
     printf("levels=%d  final: phase=%d level=%d guards=%d hostages=%d bombs=%d\n",
            g_level_count, (int)g.phase, g.level_idx + 1, g.guard_count,

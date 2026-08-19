@@ -137,6 +137,7 @@ void app_main(void)
         if (game.events & EV_BOMB_THROW) audio_sfx(SFX_BOMB_THROW);
         if (game.events & EV_BOMB_BURST) audio_sfx(SFX_BOMB_BURST);
         if (game.events & EV_RESCUE)     audio_sfx(SFX_RESCUE);
+        if (game.events & EV_DETECT)     audio_sfx(SFX_DETECT);
         if (game.events & EV_SPOTTED)    audio_sfx(SFX_SPOTTED);
         if (game.events & EV_CAUGHT)     audio_sfx(SFX_CAUGHT);
         if (game.events & EV_CLEAR)      audio_sfx(SFX_CLEAR);

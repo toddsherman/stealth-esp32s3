@@ -21,6 +21,7 @@ typedef enum {
     SFX_CAUGHT,
     SFX_CLEAR,
     SFX_SPOTTED,
+    SFX_DETECT,     // a guard's cone just went hot - the loudest cue there is
     SFX_ARM,
 } sfx_t;
 

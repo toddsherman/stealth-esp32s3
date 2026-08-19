@@ -170,6 +170,8 @@ void guard_update(game_t *g, guard_t *gd, float dt)
     const bool visible = sees_player(g, gd, &dist);
     gd->sees_player = visible;
 
+    if (gd->detect_cd > 0.0f) gd->detect_cd -= dt;
+
     if (visible) {
         // Closer and more central fills the meter faster.
         const float closeness = 1.0f - (dist / GUARD_RANGE);
@@ -186,6 +188,17 @@ void guard_update(game_t *g, guard_t *gd, float dt)
             gd->mode   = GM_INVESTIGATE;   // head for where they were last seen
             gd->look_t = 0.0f;
         }
+    }
+
+    // Detection edge. This is the instant the cone goes hot, so the alarm
+    // lands on exactly the frame the player sees the colour change.
+    const bool was_detecting = gd->detecting;
+    if (gd->alert >= ALERT_DETECT_ON)       gd->detecting = true;
+    else if (gd->alert <= ALERT_DETECT_OFF) gd->detecting = false;
+
+    if (!was_detecting && gd->detecting && gd->detect_cd <= 0.0f) {
+        g->events |= EV_DETECT;
+        gd->detect_cd = DETECT_COOLDOWN;
     }
 
     switch (gd->mode) {

@@ -48,6 +48,13 @@ extern "C" {
 #define CONE_RAYS         40
 
 #define ALERT_DRAIN       0.75f       // per second when nothing is visible
+// The moment a guard resolves you from "something moved" into "someone is
+// there". One flag drives both the cone turning hot and the alarm sting, so
+// the two can never drift apart. Hysteresis plus a cooldown stops a guard
+// hovering on the edge of detection from machine-gunning the sound.
+#define ALERT_DETECT_ON   0.05f
+#define ALERT_DETECT_OFF  0.015f
+#define DETECT_COOLDOWN   1.2f        // seconds before the same guard re-stings
 #define LOOK_DURATION     1.6f        // seconds spent scanning at a noise
 #define NOISE_TILES_RUN   4           // flood radius of a sprinting footstep
 #define NOISE_TILES_BOMB  10          // flood radius of a sound bomb
@@ -109,6 +116,7 @@ enum {
     EV_CAUGHT      = 1u << 3,
     EV_CLEAR       = 1u << 4,
     EV_SPOTTED     = 1u << 5,   // a guard just went from calm to chasing
+    EV_DETECT      = 1u << 6,   // a guard's cone just went hot: you are noticed
 };
 
 typedef enum { GS_TITLE, GS_BRIEF, GS_PLAY, GS_CAUGHT, GS_CLEAR, GS_WIN } phase_t;
@@ -130,6 +138,8 @@ typedef struct {
     float               dwell_t;
     float               look_t;
     float               alert;        // 0..1 detection meter
+    bool                detecting;    // cone is hot; drives colour and alarm
+    float               detect_cd;    // re-sting cooldown
     float               ix, iy;       // point being investigated
     bool                sees_player;
     const guard_def_t  *def;

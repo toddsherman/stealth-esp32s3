@@ -44,9 +44,9 @@ int main(int argc, char **argv)
         fwrite(buf, 2, FRAMES, f); total += FRAMES;
     }
 
-    // 2) Silence, then each effect with a gap.
+    // 2) Each effect over the music bed, so ducking is audible.
     synth_set_tension(0.0f);
-    const sfx_t order[] = { SFX_SPOTTED, SFX_BOMB_THROW, SFX_BOMB_BURST,
+    const sfx_t order[] = { SFX_DETECT, SFX_SPOTTED, SFX_BOMB_THROW, SFX_BOMB_BURST,
                             SFX_RESCUE, SFX_CAUGHT, SFX_CLEAR, SFX_ARM };
     for (unsigned k = 0; k < sizeof(order)/sizeof(order[0]); k++) {
         synth_sfx(order[k]);

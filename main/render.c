@@ -161,7 +161,7 @@ void game_render_prepare(const game_t *g)
 
         s_cone[i].n = n;
         // The cone brightens as the guard closes in on certainty.
-        s_cone[i].col   = (gd->alert > 0.05f) ? COL_CONE_HOT : COL_CONE;
+        s_cone[i].col   = gd->detecting ? COL_CONE_HOT : COL_CONE;
         s_cone[i].alpha = (uint32_t)(5.0f + gd->alert * 9.0f);
     }
 }

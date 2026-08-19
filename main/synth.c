@@ -66,6 +66,7 @@ static bool  s_hb_running;
 
 static bool  s_music_enabled;
 static float s_music_gain;               // smoothed toward the target
+static float s_duck = 1.0f;              // music dip while an alarm rings
 static float s_drone_phase[DRONE_COUNT];
 static float s_drone_dphase[DRONE_COUNT];
 static float s_lfo_phase;
@@ -115,6 +116,7 @@ void synth_init(uint32_t sample_rate)
         s_drone_dphase[i] = hz[i] * s_dt;
     }
     s_lfo_phase  = 0.0f;
+    s_duck       = 1.0f;
     s_step_clock = 0.0f;
     s_step       = 0;
     s_music_gain = 0.0f;
@@ -190,9 +192,20 @@ static void fire(sfx_t sfx)
         voice_start(V_SINE, 784, 784, 0.28f, 0.50f, 3.0f);
         break;
     case SFX_SPOTTED:
-        // The one sound that must cut through everything else.
-        voice_start(V_SINE, 1200, 1200, 0.34f, 0.09f, 8.0f);
-        voice_start(V_SINE,  900,  900, 0.34f, 0.22f, 6.0f);
+        // Secondary: they have committed to chasing. Deliberately quieter and
+        // lower than SFX_DETECT so the initial alarm stays the headline.
+        voice_start(V_HARM, 620, 590, 0.26f, 0.12f, 8.0f);
+        voice_start(V_HARM, 465, 440, 0.26f, 0.26f, 6.0f);
+        break;
+    case SFX_DETECT:
+        // A tritone - the most unstable interval available - stabbed hard and
+        // held just long enough to register, with a bright noise transient on
+        // the front so it reads as an alarm rather than a note. Loudest cue in
+        // the game by a wide margin, and it ducks the music underneath.
+        voice_start(V_HARM,  880.00f,  830.0f, 0.62f, 0.42f, 3.4f);   // A5
+        voice_start(V_HARM, 1244.51f, 1180.0f, 0.52f, 0.38f, 3.8f);   // Eb6
+        voice_start(V_NOISE, 3000.0f,  900.0f, 0.34f, 0.10f, 9.0f);   // snap
+        s_duck = 0.28f;
         break;
     case SFX_ARM:
         voice_start(V_SINE, 1500, 1500, 0.14f, 0.05f, 10.0f);
@@ -241,6 +254,7 @@ static void music_tick(float dt)
 {
     const float target = s_music_enabled ? 1.0f : 0.0f;
     s_music_gain += (target - s_music_gain) * 0.06f;   // slow fade in/out
+    s_duck += (1.0f - s_duck) * 0.05f;                 // ~0.5s recovery
     if (s_music_gain < 0.001f) return;
 
     const float step_dur = 60.0f / MUSIC_BPM / (float)MUSIC_STEPS;
@@ -252,7 +266,7 @@ static void music_tick(float dt)
 
         const int beat   = s_step / MUSIC_STEPS;
         const int sub    = s_step % MUSIC_STEPS;
-        const float g    = s_music_gain;
+        const float g    = s_music_gain * s_duck;
 
         // Root pulse on the downbeat of every bar.
         if (sub == 0 && (beat % 4) == 0) {
@@ -300,7 +314,7 @@ static inline float drone_sample(void)
         const float p = s_drone_phase[i];
         sum += (osc(p) + 0.50f * osc(p * 2.0f) + 0.28f * osc(p * 3.0f)) * a;
     }
-    return sum * lfo * s_music_gain;
+    return sum * lfo * s_music_gain * s_duck;
 }
 
 static inline float voice_sample(voice_t *v)
