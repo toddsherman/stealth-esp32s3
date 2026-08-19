@@ -31,7 +31,11 @@ static inline float osc(float phase)
     return a + (b - a) * frac;
 }
 
-typedef enum { V_SINE, V_NOISE, V_THUMP } vshape_t;
+// V_HARM sums a fundamental with its 2nd and 3rd harmonics. This board's
+// speaker rolls off hard below ~300Hz, so a bare low sine is inaudible; the
+// harmonics land where the speaker actually works and the ear still infers
+// the missing fundamental. Every low-pitched sound here uses it.
+typedef enum { V_SINE, V_NOISE, V_THUMP, V_HARM } vshape_t;
 
 typedef struct {
     bool     active;
@@ -101,9 +105,11 @@ void synth_init(uint32_t sample_rate)
     s_hb_running = false;
     s_q_head = s_q_tail = 0;
 
-    // D1, A1, D2 (detuned a hair against D1 for slow beating), and an Eb that
-    // only fades in under tension to sour the chord.
-    const float hz[DRONE_COUNT] = { 36.71f, 55.00f, 73.60f, 77.78f };
+    // A4, D5 (the root), A5 detuned a hair for slow beating, and an Eb5 that
+    // only fades in under tension to sour the root into a minor second.
+    // These fundamentals sit inside the speaker's passband deliberately -
+    // pitched for this hardware, not for headphones. See V_HARM.
+    const float hz[DRONE_COUNT] = { 440.00f, 587.33f, 881.30f, 622.25f };
     for (int i = 0; i < DRONE_COUNT; i++) {
         s_drone_phase[i]  = 0.0f;
         s_drone_dphase[i] = hz[i] * s_dt;
@@ -167,7 +173,7 @@ static void fire(sfx_t sfx)
         voice_start(V_NOISE, 1800, 700, 0.16f, 0.12f, 7.0f);
         break;
     case SFX_BOMB_BURST:
-        voice_start(V_THUMP, 150, 60,  0.55f, 0.35f, 9.0f);
+        voice_start(V_HARM, 185, 95,  0.55f, 0.35f, 9.0f);
         voice_start(V_NOISE, 900, 180, 0.30f, 0.45f, 6.0f);
         break;
     case SFX_RESCUE:
@@ -175,7 +181,7 @@ static void fire(sfx_t sfx)
         voice_start(V_SINE, 990,  1320, 0.24f, 0.18f, 4.0f);
         break;
     case SFX_CAUGHT:
-        voice_start(V_SINE,  420, 90,  0.45f, 0.70f, 2.6f);
+        voice_start(V_HARM,  430, 165, 0.45f, 0.70f, 2.6f);
         voice_start(V_NOISE, 700, 120, 0.35f, 0.60f, 3.0f);
         break;
     case SFX_CLEAR:
@@ -213,7 +219,7 @@ static void heartbeat_tick(float dt)
     if (!s_hb_running) {
         s_hb_running = true;
         s_hb_clock   = 0.0f;
-        voice_start(V_THUMP, 62.0f, 38.0f, gain, 0.20f, 11.0f);
+        voice_start(V_HARM, 200.0f, 150.0f, gain, 0.20f, 11.0f);
         return;
     }
 
@@ -221,11 +227,11 @@ static void heartbeat_tick(float dt)
     s_hb_clock += dt;
 
     if (prev < dub_at && s_hb_clock >= dub_at) {
-        voice_start(V_THUMP, 48.0f, 30.0f, gain * 0.66f, 0.17f, 12.0f);
+        voice_start(V_HARM, 165.0f, 125.0f, gain * 0.66f, 0.17f, 12.0f);
     }
     if (s_hb_clock >= period) {
         s_hb_clock -= period;
-        voice_start(V_THUMP, 62.0f, 38.0f, gain, 0.20f, 11.0f);
+        voice_start(V_HARM, 200.0f, 150.0f, gain, 0.20f, 11.0f);
     }
 }
 
@@ -250,15 +256,15 @@ static void music_tick(float dt)
 
         // Root pulse on the downbeat of every bar.
         if (sub == 0 && (beat % 4) == 0) {
-            voice_start(V_THUMP, 73.42f, 69.0f, 0.11f * g, 0.55f, 4.0f);
+            voice_start(V_HARM, 293.66f, 277.0f, 0.13f * g, 0.55f, 4.0f);
         }
         // The fifth, late in the bar, so the pulse never feels square.
         if (sub == 0 && (beat % 4) == 2) {
-            voice_start(V_THUMP, 55.00f, 52.0f, 0.075f * g, 0.45f, 4.5f);
+            voice_start(V_HARM, 220.00f, 208.0f, 0.095f * g, 0.45f, 4.5f);
         }
         // Under pressure an off-beat eighth creeps in and doubles the pulse.
         if (s_tension > 0.35f && sub == 2 && (beat % 2) == 1) {
-            voice_start(V_THUMP, 73.42f, 70.0f, 0.055f * g * s_tension, 0.22f, 7.0f);
+            voice_start(V_HARM, 293.66f, 285.0f, 0.070f * g * s_tension, 0.22f, 7.0f);
         }
         // A bell every four bars, picked pseudo-randomly from the scale.
         if (s_step == 0) {
@@ -278,7 +284,7 @@ static inline float drone_sample(void)
     const float lfo = 0.75f + 0.25f * osc(s_lfo_phase);
 
     float sum = 0.0f;
-    static const float amp[DRONE_COUNT] = { 0.055f, 0.032f, 0.026f, 0.030f };
+    static const float amp[DRONE_COUNT] = { 0.030f, 0.020f, 0.015f, 0.018f };
 
     for (int i = 0; i < DRONE_COUNT; i++) {
         s_drone_phase[i] += s_drone_dphase[i];
@@ -287,7 +293,12 @@ static inline float drone_sample(void)
         // The fourth voice is the minor second; it only exists when things
         // are going badly, which is where the unease comes from.
         const float a = (i == 3) ? amp[i] * s_tension : amp[i];
-        sum += osc(s_drone_phase[i]) * a;
+
+        // Harmonics rather than a bare sine: an organ-like pad reads as
+        // ominous instead of as a test tone, and it puts most of the energy
+        // an octave or two up where this speaker can actually move air.
+        const float p = s_drone_phase[i];
+        sum += (osc(p) + 0.50f * osc(p * 2.0f) + 0.28f * osc(p * 3.0f)) * a;
     }
     return sum * lfo * s_music_gain;
 }
@@ -307,6 +318,11 @@ static inline float voice_sample(voice_t *v)
     switch (v->shape) {
     case V_NOISE: s = frand(); break;
     case V_THUMP: s = osc(v->phase) * 0.92f + frand() * 0.08f; break;
+    case V_HARM: {
+        const float p = v->phase;
+        s = (osc(p) + 0.55f * osc(p * 2.0f) + 0.32f * osc(p * 3.0f)) * 0.54f;
+        break;
+    }
     case V_SINE:
     default:      s = osc(v->phase); break;
     }

@@ -17,7 +17,7 @@ static const char *TAG = "audio";
 
 #define SAMPLE_RATE   22050
 #define FRAMES        256          // ~11.6ms per write
-#define OUT_VOLUME    72.0f        // percent into the codec
+#define OUT_VOLUME    82.0f        // percent into the codec
 
 #define PIN_I2S_MCLK  GPIO_NUM_16
 #define PIN_I2S_BCLK  GPIO_NUM_9

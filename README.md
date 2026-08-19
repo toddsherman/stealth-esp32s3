@@ -71,8 +71,23 @@ There are no audio samples in flash — everything is synthesised live by
   later), ramping from 52 to 168 BPM as tension climbs.
 - **Music bed** — a slow unresolved drone in D minor at 76 BPM, with a sparse
   pulse on the bar and an occasional bell. A minor second fades into the drone
-  *only* as tension rises, which is where the unease comes from. It peaks at
-  14% of full scale: it raises the floor, it does not ask to be listened to.
+  *only* as tension rises, which is where the unease comes from. It stays
+  quiet: it raises the floor, it does not ask to be listened to.
+
+**Everything is pitched for this speaker, not for headphones.** The board's
+speaker rolls off hard below roughly 300-400Hz, so the obvious choices — a
+36Hz drone, a 62Hz heartbeat thump — are inaudible on the hardware no matter
+how loud you make them. The first version of this made exactly that mistake:
+98% of the music's energy sat below 250Hz and nothing could be heard.
+
+Two things fix it. Fundamentals live inside the passband (the drone is
+A4/D5/A5 rather than D1/A1), and every low-pitched sound uses `V_HARM`, which
+sums a fundamental with its 2nd and 3rd harmonics — the harmonics land where
+the speaker can move air and the ear still infers the missing fundamental.
+The result moved the bed from 8.6% to 68.7% of its energy above 300Hz.
+
+`tools/host/synthwav.c` renders the real synth to a WAV, which is how that was
+measured without a speaker in hand.
 
 The inner loop uses a 1024-entry sine table and multiplicative envelopes
 rather than `sinf`/`expf` per sample, which is what leaves room for a
