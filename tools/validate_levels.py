@@ -7,7 +7,7 @@ player. Run before flashing.
 """
 import re, sys, collections
 
-W, H = 23, 25
+W, H = 23, 28
 src = open("main/level.c").read()
 
 # Strip comments so map rows are the only quoted strings we see.

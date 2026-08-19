@@ -16,13 +16,14 @@ extern "C" {
 #endif
 
 // ---- Geometry -------------------------------------------------------------
+// The play field is the whole panel: 23 x 28 tiles of 16px = 368 x 448.
+// There is no HUD strip - the few things that must stay on screen float over
+// the field as translucent overlays instead of stealing a band from it.
 #define TILE        16
 #define GRID_W      23
-#define GRID_H      25
+#define GRID_H      28
 #define PLAY_W      (GRID_W * TILE)   // 368
-#define PLAY_H      (GRID_H * TILE)   // 400
-#define HUD_Y       PLAY_H
-#define HUD_H       48                // 400..448
+#define PLAY_H      (GRID_H * TILE)   // 448
 
 #define MAX_GUARDS      6
 #define MAX_HOSTAGES    4
@@ -75,7 +76,6 @@ extern "C" {
 #define COL_EXIT      RGB565( 52, 211, 153)
 #define COL_EXIT_LOCK RGB565( 55,  70,  80)
 #define COL_SOUND     RGB565(125, 211, 252)
-#define COL_HUD_BG    RGB565( 10,  12,  18)
 #define COL_TEXT      RGB565(190, 200, 215)
 #define COL_TEXT_DIM  RGB565( 84,  94, 112)
 #define COL_WHITE     RGB565(255, 255, 255)

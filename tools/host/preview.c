@@ -43,23 +43,28 @@ static void render_to_fb(const game_t *g)
 // Advance the simulation with a synthetic finger, exactly as the device would.
 static float g_tilt_x, g_tilt_y;
 
+// Touch state persists across sim() calls. Making it a local would reset
+// "finger down" on every call, so no press or release edge could ever be
+// computed across two calls - which is exactly how a tap is expressed here.
+static touch_state_t g_ts;
+
 static void sim(game_t *g, float seconds, const touch_state_t *hold)
 {
     const float dt = 1.0f / 60.0f;
     const int steps = (int)(seconds / dt);
-    touch_state_t ts = {0};
     game_input_t in = {0};
 
     for (int i = 0; i < steps; i++) {
+        const bool was = g_ts.down;
         if (hold) {
-            const bool was = ts.down;
-            ts = *hold;
-            ts.pressed = hold->down && !was;
-            ts.released = !hold->down && was;
+            g_ts = *hold;
+            g_ts.pressed  = hold->down && !was;
+            g_ts.released = !hold->down && was;
         } else {
-            memset(&ts, 0, sizeof(ts));
+            memset(&g_ts, 0, sizeof(g_ts));
+            g_ts.released = was;      // synthesise the lift
         }
-        hud_build_input(&in, &ts, g_tilt_x, g_tilt_y, g, dt);
+        hud_build_input(&in, &g_ts, g_tilt_x, g_tilt_y, g, dt);
         game_update(g, dt, &in);
     }
 }
@@ -107,7 +112,7 @@ int main(int argc, char **argv)
     game_load_level(&g, 2);
     tap(&g, 184, 300);
     sim(&g, 1.0f, NULL);
-    tap(&g, 332, HUD_Y + HUD_H / 2);   // bomb button
+    tap(&g, PLAY_W - 38, PLAY_H - 38);   // bomb button, now floating
     render_to_fb(&g);
     snprintf(path, sizeof(path), "%s/04_armed_l3.ppm", outdir);
     write_ppm(path);
@@ -164,6 +169,16 @@ int main(int argc, char **argv)
         write_ppm(path);
     }
     sim(&g, 0.2f, NULL);
+
+    // --- the centred re-level popup ---
+    game_load_level(&g, 0);
+    tap(&g, 184, 320);
+    sim(&g, 1.0f, NULL);
+    tap(&g, 184, 220);              // short tap on the map = re-level
+    sim(&g, 0.15f, NULL);
+    render_to_fb(&g);
+    snprintf(path, sizeof(path), "%s/10_levelled.ppm", outdir);
+    write_ppm(path);
 
     // --- integration check: the alarm must fire on the exact frame the cone
     // --- turns hot, otherwise the audio and the visual have drifted apart.

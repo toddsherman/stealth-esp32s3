@@ -40,7 +40,7 @@ sight.
 | Move | **Tilt the board.** Speed rises continuously with the angle |
 | Throw a sound bomb | Tap the bomb button, then tap where it should land |
 | Reveal patrol routes | **Press and hold** the map — a hairline traces each guard's full circuit |
-| Re-level the tilt neutral | Short tap on the map (when no bomb is armed) |
+| Re-level the tilt neutral | Short tap on the map (when no bomb is armed) — confirmed by a centred panel |
 | Menus | Tap |
 
 Speed is a continuous function of tilt angle, not a walk/run toggle: a slight
@@ -65,6 +65,14 @@ Or manually:
 ```bash
 source ~/esp/esp-idf/export.sh && idf.py -B /tmp/stealth-build -p /dev/cu.usbmodem1101 flash monitor
 ```
+
+## Screen layout
+
+The game uses the whole 368x448 panel — there is no HUD strip. The play field
+is 23x28 tiles at 16px, which fills the panel exactly. The handful of things
+that must stay visible float over the field instead of taking a band from it:
+level and hostage tally top-left, tilt bubble bottom-left, bomb control
+bottom-right, and the alert meter climbing the left and right edges.
 
 ## Sound
 

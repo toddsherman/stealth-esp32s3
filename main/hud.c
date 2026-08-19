@@ -9,12 +9,18 @@
 // re-levels the IMU, so "neutral" can be rebased to however you are holding
 // the board without leaving the level.
 
-#define BOMB_BTN_X    332
-#define BOMB_BTN_Y    (HUD_Y + HUD_H / 2)
-#define BOMB_BTN_R    19
+// The bomb control floats over the field now rather than sitting in a strip.
+// Bottom-right, clear of the alert column on that edge.
+#define BOMB_BTN_X    (PLAY_W - 38)
+#define BOMB_BTN_Y    (PLAY_H - 38)
+#define BOMB_BTN_R    21
 
 #define LEVEL_TOAST_T 1.1f    // seconds the "levelled" confirmation shows
 #define HOLD_REVEAL_T 0.35f   // hold this long to reveal the patrol routes
+
+// Centred confirmation panel shown after a re-level.
+#define TOAST_W       208
+#define TOAST_H       78
 
 static float s_tilt_x, s_tilt_y;   // last tilt, for the HUD bubble
 static float s_toast_t;            // countdown on the re-level confirmation
@@ -97,7 +103,7 @@ void hud_build_input(game_input_t *in, const touch_state_t *ts,
 // makes an off-centre neutral obvious instead of mysterious.
 static void draw_tilt_bubble(gfx_surf_t *s, const game_t *g)
 {
-    const int cx = 196, cy = HUD_Y + HUD_H / 2, r = 17;
+    const int cx = 34, cy = PLAY_H - 34, r = 15;
 
     gfx_ring(s, cx, cy, r, 1, COL_TEXT_DIM, 14);
     gfx_fill_rect(s, cx - 2, cy, 5, 1, COL_TEXT_DIM);
@@ -125,7 +131,19 @@ static void draw_aim(gfx_surf_t *s, const game_t *g)
 static void draw_toast(gfx_surf_t *s)
 {
     if (s_toast_t <= 0.0f) return;
-    gfx_text_centered(s, PLAY_W / 2, PLAY_H - 26, "LEVELLED", COL_PLAYER, 1);
+
+    // Fade out over the last third so it does not simply vanish.
+    const float f = (s_toast_t < LEVEL_TOAST_T * 0.34f)
+                  ? (s_toast_t / (LEVEL_TOAST_T * 0.34f)) : 1.0f;
+
+    const int x = (PLAY_W - TOAST_W) / 2;
+    const int y = (PLAY_H - TOAST_H) / 2;
+
+    gfx_blend_rect(s, x, y, TOAST_W, TOAST_H, RGB565(6, 10, 16),
+                   (uint32_t)(26.0f * f));
+    gfx_rect_frame(s, x, y, TOAST_W, TOAST_H, 1, COL_PLAYER_D);
+    gfx_text_centered(s, PLAY_W / 2, y + 20, "LEVELLED", COL_PLAYER, 3);
+    gfx_text_centered(s, PLAY_W / 2, y + 52, "TILT NEUTRAL SET", COL_TEXT_DIM, 1);
 }
 
 // The alert meter lives in your peripheral vision rather than in the HUD:
@@ -170,7 +188,7 @@ static void draw_alert_columns(gfx_surf_t *s, const game_t *g)
 static void draw_reveal_label(gfx_surf_t *s, const game_t *g)
 {
     if (!g->reveal_paths) return;
-    gfx_text_centered(s, PLAY_W / 2, PLAY_H - 14, "PATROL ROUTES", COL_TEXT_DIM, 1);
+    gfx_text_centered(s, PLAY_W / 2, PLAY_H - 16, "PATROL ROUTES", COL_TEXT_DIM, 1);
 }
 
 void hud_render(gfx_surf_t *s, const game_t *g)
@@ -180,22 +198,16 @@ void hud_render(gfx_surf_t *s, const game_t *g)
     draw_toast(s);
     draw_reveal_label(s, g);
 
-    gfx_fill_rect(s, 0, HUD_Y, PLAY_W, HUD_H, COL_HUD_BG);
-    gfx_fill_rect(s, 0, HUD_Y, PLAY_W, 1, RGB565(30, 36, 50));
-
-    if (g->phase == GS_TITLE || g->phase == GS_WIN) {
-        gfx_text_centered(s, PLAY_W / 2, HUD_Y + 20, "TILT TO MOVE", COL_TEXT_DIM, 1);
-        return;
-    }
+    if (g->phase == GS_TITLE || g->phase == GS_WIN) return;
 
     char buf[32];
 
-    // --- left: level + hostage pips ---
+    // --- top-left: level, then the hostage tally under it ---
     snprintf(buf, sizeof(buf), "%02d %s", g->level_idx + 1, g->lvl->name);
-    gfx_text(s, 8, HUD_Y + 7, buf, COL_TEXT_DIM, 1);
+    gfx_text(s, 12, 8, buf, COL_TEXT_DIM, 1);
 
     for (int i = 0; i < g->hostage_count; i++) {
-        const int cx = 12 + i * 15, cy = HUD_Y + 31;
+        const int cx = 16 + i * 15, cy = 26;
         if (i < g->rescued) gfx_fill_circle(s, cx, cy, 5, COL_HOSTAGE);
         else                gfx_ring(s, cx, cy, 5, 2, COL_HOSTAGE, 16);
     }
@@ -211,6 +223,8 @@ void hud_render(gfx_surf_t *s, const game_t *g)
         gfx_blend_circle(s, BOMB_BTN_X, BOMB_BTN_Y, BOMB_BTN_R + 6, COL_SOUND,
                          (uint32_t)(6 + p * 8));
     }
+    // Dark backing so the control stays readable over whatever it covers.
+    gfx_blend_circle(s, BOMB_BTN_X, BOMB_BTN_Y, BOMB_BTN_R, RGB565(4, 6, 10), 22);
     gfx_blend_circle(s, BOMB_BTN_X, BOMB_BTN_Y, BOMB_BTN_R, bc, usable ? 8 : 4);
     gfx_ring(s, BOMB_BTN_X, BOMB_BTN_Y, BOMB_BTN_R, 2, bc, GFX_ALPHA_MAX);
 

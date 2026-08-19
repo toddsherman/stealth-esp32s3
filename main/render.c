@@ -273,17 +273,17 @@ static void draw_overlay(gfx_surf_t *s, const game_t *g)
     switch (g->phase) {
     case GS_TITLE: {
         gfx_fill_rect(s, 0, 0, PLAY_W, PLAY_H, COL_BG);
-        gfx_text_centered(s, PLAY_W / 2, 120, "STEALTH", COL_PLAYER, 5);
-        gfx_fill_rect(s, PLAY_W / 2 - 60, 168, 120, 1, COL_TEXT_DIM);
-        gfx_text_centered(s, PLAY_W / 2, 186, "SEE WITHOUT BEING SEEN", COL_TEXT_DIM, 1);
+        gfx_text_centered(s, PLAY_W / 2, 144, "STEALTH", COL_PLAYER, 5);
+        gfx_fill_rect(s, PLAY_W / 2 - 60, 192, 120, 1, COL_TEXT_DIM);
+        gfx_text_centered(s, PLAY_W / 2, 210, "SEE WITHOUT BEING SEEN", COL_TEXT_DIM, 1);
 
-        gfx_text_centered(s, PLAY_W / 2, 234, "TILT THE BOARD TO MOVE", COL_TEXT, 1);
-        gfx_text_centered(s, PLAY_W / 2, 252, "TILT HARD = RUN = LOUD", COL_TEXT, 1);
-        gfx_text_centered(s, PLAY_W / 2, 270, "TAP BOMB THEN TAP A SPOT", COL_TEXT, 1);
-        gfx_text_centered(s, PLAY_W / 2, 288, "TAP THE MAP TO RE-LEVEL", COL_TEXT_DIM, 1);
+        gfx_text_centered(s, PLAY_W / 2, 258, "TILT THE BOARD TO MOVE", COL_TEXT, 1);
+        gfx_text_centered(s, PLAY_W / 2, 276, "TILT HARD = RUN = LOUD", COL_TEXT, 1);
+        gfx_text_centered(s, PLAY_W / 2, 294, "TAP BOMB THEN TAP A SPOT", COL_TEXT, 1);
+        gfx_text_centered(s, PLAY_W / 2, 312, "TAP THE MAP TO RE-LEVEL", COL_TEXT_DIM, 1);
 
         if (fmodf(g->phase_t, 1.2f) < 0.7f) {
-            gfx_text_centered(s, PLAY_W / 2, 330, "TAP TO BEGIN", COL_PLAYER, 2);
+            gfx_text_centered(s, PLAY_W / 2, 354, "TAP TO BEGIN", COL_PLAYER, 2);
         }
         break;
     }
@@ -291,17 +291,17 @@ static void draw_overlay(gfx_surf_t *s, const game_t *g)
     case GS_BRIEF: {
         dim(s, 24);
         snprintf(buf, sizeof(buf), "%d / %d", g->level_idx + 1, g_level_count);
-        gfx_text_centered(s, PLAY_W / 2, 140, buf, COL_TEXT_DIM, 1);
-        gfx_text_centered(s, PLAY_W / 2, 162, g->lvl->name, COL_PLAYER, 3);
-        gfx_text_centered(s, PLAY_W / 2, 206, g->lvl->hint, COL_TEXT, 1);
+        gfx_text_centered(s, PLAY_W / 2, 164, buf, COL_TEXT_DIM, 1);
+        gfx_text_centered(s, PLAY_W / 2, 186, g->lvl->name, COL_PLAYER, 3);
+        gfx_text_centered(s, PLAY_W / 2, 230, g->lvl->hint, COL_TEXT, 1);
 
         snprintf(buf, sizeof(buf), "%d HOSTAGE%s   %d BOMB%s",
                  g->hostage_count, g->hostage_count == 1 ? "" : "S",
                  g->bombs_left,    g->bombs_left    == 1 ? "" : "S");
-        gfx_text_centered(s, PLAY_W / 2, 240, buf, COL_TEXT_DIM, 1);
+        gfx_text_centered(s, PLAY_W / 2, 264, buf, COL_TEXT_DIM, 1);
 
         if (fmodf(g->phase_t, 1.2f) < 0.7f) {
-            gfx_text_centered(s, PLAY_W / 2, 300, "TAP TO START", COL_PLAYER, 2);
+            gfx_text_centered(s, PLAY_W / 2, 324, "TAP TO START", COL_PLAYER, 2);
         }
         break;
     }
@@ -312,21 +312,21 @@ static void draw_overlay(gfx_surf_t *s, const game_t *g)
                            (uint32_t)(g->flash * 18.0f));
         }
         dim(s, 16);
-        gfx_text_centered(s, PLAY_W / 2, 170, "SPOTTED", COL_ALERT, 4);
+        gfx_text_centered(s, PLAY_W / 2, 194, "SPOTTED", COL_ALERT, 4);
         if (g->phase_t > 1.1f && fmodf(g->phase_t, 1.2f) < 0.7f) {
-            gfx_text_centered(s, PLAY_W / 2, 240, "TAP TO RETRY", COL_TEXT, 2);
+            gfx_text_centered(s, PLAY_W / 2, 264, "TAP TO RETRY", COL_TEXT, 2);
         }
         break;
     }
 
     case GS_CLEAR: {
         dim(s, 20);
-        gfx_text_centered(s, PLAY_W / 2, 160, "CLEAR", COL_EXIT, 4);
+        gfx_text_centered(s, PLAY_W / 2, 184, "CLEAR", COL_EXIT, 4);
         snprintf(buf, sizeof(buf), "%d:%04.1f", (int)(g->level_time / 60.0f),
                  fmodf(g->level_time, 60.0f));
-        gfx_text_centered(s, PLAY_W / 2, 210, buf, COL_TEXT, 2);
+        gfx_text_centered(s, PLAY_W / 2, 234, buf, COL_TEXT, 2);
         if (g->phase_t > 0.8f && fmodf(g->phase_t, 1.2f) < 0.7f) {
-            gfx_text_centered(s, PLAY_W / 2, 270,
+            gfx_text_centered(s, PLAY_W / 2, 294,
                               (g->level_idx + 1 >= g_level_count) ? "TAP TO FINISH"
                                                                   : "TAP TO CONTINUE",
                               COL_PLAYER, 2);
@@ -336,11 +336,11 @@ static void draw_overlay(gfx_surf_t *s, const game_t *g)
 
     case GS_WIN: {
         gfx_fill_rect(s, 0, 0, PLAY_W, PLAY_H, COL_BG);
-        gfx_text_centered(s, PLAY_W / 2, 150, "ALL CLEAR", COL_EXIT, 4);
-        gfx_text_centered(s, PLAY_W / 2, 210, "EVERY HOSTAGE HOME", COL_TEXT, 1);
-        gfx_text_centered(s, PLAY_W / 2, 228, "NOBODY SAW A THING", COL_TEXT, 1);
+        gfx_text_centered(s, PLAY_W / 2, 174, "ALL CLEAR", COL_EXIT, 4);
+        gfx_text_centered(s, PLAY_W / 2, 234, "EVERY HOSTAGE HOME", COL_TEXT, 1);
+        gfx_text_centered(s, PLAY_W / 2, 252, "NOBODY SAW A THING", COL_TEXT, 1);
         if (fmodf(g->phase_t, 1.2f) < 0.7f) {
-            gfx_text_centered(s, PLAY_W / 2, 300, "TAP FOR TITLE", COL_PLAYER, 2);
+            gfx_text_centered(s, PLAY_W / 2, 324, "TAP FOR TITLE", COL_PLAYER, 2);
         }
         break;
     }
