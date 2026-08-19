@@ -66,6 +66,12 @@ Or manually:
 source ~/esp/esp-idf/export.sh && idf.py -B /tmp/stealth-build -p /dev/cu.usbmodem1101 flash monitor
 ```
 
+## Screen key
+
+Every on-screen element, rendered from the game's own palette and rasteriser:
+
+![screen key](docs/legend.png)
+
 ## Screen layout
 
 The game uses the whole 368x448 panel — there is no HUD strip. The play field

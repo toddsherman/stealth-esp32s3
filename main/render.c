@@ -290,18 +290,15 @@ static void draw_overlay(gfx_surf_t *s, const game_t *g)
 
     case GS_BRIEF: {
         dim(s, 24);
+        // Just the level: number, name, and the prompt. The briefing used to
+        // carry a hint line and a tally in 5px text, which is unreadable at
+        // arm's length on a 1.8in panel.
         snprintf(buf, sizeof(buf), "%d / %d", g->level_idx + 1, g_level_count);
-        gfx_text_centered(s, PLAY_W / 2, 164, buf, COL_TEXT_DIM, 1);
-        gfx_text_centered(s, PLAY_W / 2, 186, g->lvl->name, COL_PLAYER, 3);
-        gfx_text_centered(s, PLAY_W / 2, 230, g->lvl->hint, COL_TEXT, 1);
-
-        snprintf(buf, sizeof(buf), "%d HOSTAGE%s   %d BOMB%s",
-                 g->hostage_count, g->hostage_count == 1 ? "" : "S",
-                 g->bombs_left,    g->bombs_left    == 1 ? "" : "S");
-        gfx_text_centered(s, PLAY_W / 2, 264, buf, COL_TEXT_DIM, 1);
+        gfx_text_centered(s, PLAY_W / 2, 168, buf, COL_TEXT_DIM, 2);
+        gfx_text_centered(s, PLAY_W / 2, 200, g->lvl->name, COL_PLAYER, 4);
 
         if (fmodf(g->phase_t, 1.2f) < 0.7f) {
-            gfx_text_centered(s, PLAY_W / 2, 324, "TAP TO START", COL_PLAYER, 2);
+            gfx_text_centered(s, PLAY_W / 2, 300, "TAP TO START", COL_PLAYER, 3);
         }
         break;
     }
@@ -312,9 +309,9 @@ static void draw_overlay(gfx_surf_t *s, const game_t *g)
                            (uint32_t)(g->flash * 18.0f));
         }
         dim(s, 16);
-        gfx_text_centered(s, PLAY_W / 2, 194, "SPOTTED", COL_ALERT, 4);
+        gfx_text_centered(s, PLAY_W / 2, 186, "SPOTTED", COL_ALERT, 5);
         if (g->phase_t > 1.1f && fmodf(g->phase_t, 1.2f) < 0.7f) {
-            gfx_text_centered(s, PLAY_W / 2, 264, "TAP TO RETRY", COL_TEXT, 2);
+            gfx_text_centered(s, PLAY_W / 2, 272, "TAP TO RETRY", COL_TEXT, 3);
         }
         break;
     }

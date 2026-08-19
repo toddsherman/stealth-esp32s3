@@ -69,6 +69,14 @@ static void sim(game_t *g, float seconds, const touch_state_t *hold)
     }
 }
 
+// Clears latched input between scenarios. Without this, a tilt set for one
+// shot keeps driving the player through every scene that follows.
+static void reset_inputs(void)
+{
+    g_tilt_x = g_tilt_y = 0.0f;
+    memset(&g_ts, 0, sizeof(g_ts));
+}
+
 static void tap(game_t *g, int x, int y)
 {
     sim(g, 0.55f, NULL);   // menus ignore taps until the phase has settled
@@ -108,6 +116,7 @@ int main(int argc, char **argv)
     snprintf(path, sizeof(path), "%s/03_play_l1.ppm", outdir);
     write_ppm(path);
 
+    reset_inputs();
     // --- level 3: arm a bomb and throw it, catch the sound ring ---
     game_load_level(&g, 2);
     tap(&g, 184, 300);
@@ -123,6 +132,7 @@ int main(int argc, char **argv)
     snprintf(path, sizeof(path), "%s/05_bomb_l3.ppm", outdir);
     write_ppm(path);
 
+    reset_inputs();
     // --- level 1 with the patrol routes revealed (press and hold) ---
     game_load_level(&g, 0);
     tap(&g, 184, 300);
@@ -136,6 +146,7 @@ int main(int argc, char **argv)
     }
     sim(&g, 0.2f, NULL);
 
+    reset_inputs();
     // --- alert columns: stand in front of the guard and let it build ---
     game_load_level(&g, 0);
     tap(&g, 184, 300);
@@ -149,6 +160,7 @@ int main(int argc, char **argv)
     printf("alert after 0.55s in cone: %.2f (phase=%d)\n",
            (double)g.max_alert, (int)g.phase);
 
+    reset_inputs();
     // --- level 6: the busiest board ---
     game_load_level(&g, g_level_count - 1);
     tap(&g, 184, 300);
@@ -157,6 +169,7 @@ int main(int argc, char **argv)
     snprintf(path, sizeof(path), "%s/06_play_l6.ppm", outdir);
     write_ppm(path);
 
+    reset_inputs();
     // --- routes revealed on the busiest board, where they actually wind ---
     game_load_level(&g, g_level_count - 1);
     tap(&g, 184, 300);
@@ -170,6 +183,20 @@ int main(int argc, char **argv)
     }
     sim(&g, 0.2f, NULL);
 
+    reset_inputs();
+    // --- the capture screen ---
+    game_load_level(&g, 0);
+    tap(&g, 184, 320);
+    sim(&g, 0.3f, NULL);
+    g.player.x = g.guards[0].x + 40.0f;
+    g.player.y = g.guards[0].y;
+    sim(&g, 3.0f, NULL);                 // stay in the cone until identified
+    render_to_fb(&g);
+    snprintf(path, sizeof(path), "%s/11_caught.ppm", outdir);
+    write_ppm(path);
+    printf("caught screen: phase=%d (4 = GS_CAUGHT expected 3)\n", (int)g.phase);
+
+    reset_inputs();
     // --- the centred re-level popup ---
     game_load_level(&g, 0);
     tap(&g, 184, 320);
