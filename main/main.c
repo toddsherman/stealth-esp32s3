@@ -22,6 +22,7 @@
 
 #include "audio.h"
 #include "board.h"
+#include "button.h"
 #include "game.h"
 #include "gfx.h"
 #include "imu.h"
@@ -91,6 +92,9 @@ void app_main(void)
     if (audio_init() != ESP_OK) {
         ESP_LOGW(TAG, "continuing without audio");
     }
+    if (button_init() != ESP_OK) {
+        ESP_LOGW(TAG, "continuing without the menu button");
+    }
 
     s_flush_done = xSemaphoreCreateBinary();
     configASSERT(s_flush_done);
@@ -128,9 +132,10 @@ void app_main(void)
         float tilt_x = 0.0f, tilt_y = 0.0f;
         imu_tilt(&tilt_x, &tilt_y);
 
-        hud_build_input(&input, &touch, tilt_x, tilt_y, &game, dt);
+        const bool menu_btn = button_pressed();
+        hud_build_input(&input, &touch, tilt_x, tilt_y, menu_btn, &game, dt);
         if (input.recalibrate) imu_level();
-        if (input.arm_toggle)  audio_sfx(SFX_ARM);
+        if (input.menu_toggle) audio_sfx(SFX_ARM);   // menu open/close blip
         game_update(&game, dt, &input);
 
         // Drain the simulation's one-shot events into sound.
@@ -144,7 +149,7 @@ void app_main(void)
 
         // The heartbeat tracks the closest guard's certainty, and only while
         // the level is actually being played.
-        audio_set_heartbeat_enabled(game.phase == GS_PLAY);
+        audio_set_heartbeat_enabled(game.phase == GS_PLAY && !game.menu_open);
         // Music runs through the menus and the level itself, but drops away
         // for the result screens so their stings land in the clear.
         audio_set_music_enabled(game.phase == GS_TITLE || game.phase == GS_BRIEF ||
@@ -187,11 +192,13 @@ void app_main(void)
             float rax, ray, raz;
             imu_raw(&rax, &ray, &raz);
             ESP_LOGI(TAG, "fps=%.1f frame=%lums phase=%d lvl=%d touch=%s(%d,%d) "
+                          "btn=%s menu=%d "
                           "tilt=(%+.2f,%+.2f) accel=(%+.2f,%+.2f,%+.2f) "
                           "alert=%.2f rescued=%d/%d bombs=%d heap_int=%u",
                      (double)fps, (unsigned long)(frame_us / 1000),
                      (int)game.phase, game.level_idx + 1,
                      touch.down ? "DOWN" : "up", touch.x, touch.y,
+                     button_down() ? "BTN" : "---", game.menu_open ? 1 : 0,
                      (double)tilt_x, (double)tilt_y,
                      (double)rax, (double)ray, (double)raz,
                      (double)game.max_alert, game.rescued, game.hostage_count,

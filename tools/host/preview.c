@@ -64,7 +64,7 @@ static void sim(game_t *g, float seconds, const touch_state_t *hold)
             memset(&g_ts, 0, sizeof(g_ts));
             g_ts.released = was;      // synthesise the lift
         }
-        hud_build_input(&in, &g_ts, g_tilt_x, g_tilt_y, g, dt);
+        hud_build_input(&in, &g_ts, g_tilt_x, g_tilt_y, false, g, dt);
         game_update(g, dt, &in);
     }
 }
@@ -183,6 +183,38 @@ int main(int argc, char **argv)
     }
     sim(&g, 0.2f, NULL);
 
+    // --- the pause menu, opened by the physical button ---
+    reset_inputs();
+    game_load_level(&g, 0);
+    tap(&g, 184, 320);
+    sim(&g, 0.5f, NULL);
+    {
+        game_input_t in = {0};
+        touch_state_t ts = {0};
+        hud_build_input(&in, &ts, 0.0f, 0.0f, true, &g, 1.0f/60.0f);  // button
+        game_update(&g, 1.0f/60.0f, &in);
+        render_to_fb(&g);
+        snprintf(path, sizeof(path), "%s/12_menu.ppm", outdir);
+        write_ppm(path);
+        printf("menu open: %d\n", g.menu_open ? 1 : 0);
+        hud_build_input(&in, &ts, 0.0f, 0.0f, true, &g, 1.0f/60.0f);  // close
+    }
+
+    // --- exit unlock reveal, caught mid-collapse ---
+    reset_inputs();
+    game_load_level(&g, 0);
+    tap(&g, 184, 320);
+    sim(&g, 0.3f, NULL);
+    g.player.x = g.hostages[0].x;      // walk onto the hostage to free it
+    g.player.y = g.hostages[0].y;
+    sim(&g, 0.05f, NULL);
+    printf("exit_open=%d exit_anim=%.2f\n", g.exit_open ? 1 : 0, (double)g.exit_anim);
+    sim(&g, 0.22f, NULL);              // ~halfway through the 500ms collapse
+    render_to_fb(&g);
+    snprintf(path, sizeof(path), "%s/13_exitreveal.ppm", outdir);
+    write_ppm(path);
+    printf("mid-collapse exit_anim=%.2f\n", (double)g.exit_anim);
+
     reset_inputs();
     // --- the capture screen ---
     game_load_level(&g, 0);
@@ -222,7 +254,7 @@ int main(int argc, char **argv)
         game_input_t in = {0};
 
         for (int f = 0; f < 240; f++) {
-            hud_build_input(&in, &ts, 0.0f, 0.0f, &g, dt);
+            hud_build_input(&in, &ts, 0.0f, 0.0f, false, &g, dt);
             game_update(&g, dt, &in);
             if (hot_frame < 0 && g.guards[0].detecting) hot_frame = f;
             if (event_frame < 0 && (g.events & EV_DETECT)) event_frame = f;

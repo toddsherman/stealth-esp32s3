@@ -94,7 +94,16 @@ void gfx_ring(gfx_surf_t *s, int cx, int cy, int r, int t, uint16_t c, uint32_t 
     const int ro = r, ri = (r - t > 0) ? r - t : 0;
     const int ro2 = ro * ro, ri2 = ri * ri;
 
-    for (int dy = -ro; dy <= ro; dy++) {
+    // Clip the scanline range to the surface before walking it. Rings can be
+    // far larger than the screen (the exit reveal starts at ~620px radius),
+    // and iterating every row of one only to clip each span is wasteful -
+    // more so here, where the frame is rasterised once per band.
+    int dy0 = -ro, dy1 = ro;
+    const int top = s->oy - cy, bot = s->oy + s->h - 1 - cy;
+    if (dy0 < top) dy0 = top;
+    if (dy1 > bot) dy1 = bot;
+
+    for (int dy = dy0; dy <= dy1; dy++) {
         const int outer = (int)(__builtin_sqrtf((float)(ro2 - dy * dy)));
         if (abs(dy) < ri) {
             const int inner = (int)(__builtin_sqrtf((float)(ri2 - dy * dy)));

@@ -38,10 +38,17 @@ sight.
 | Action | Input |
 |---|---|
 | Move | **Tilt the board.** Speed rises continuously with the angle |
-| Throw a sound bomb | Tap the bomb button, then tap where it should land |
-| Reveal patrol routes | **Press and hold** the map — a hairline traces each guard's full circuit |
-| Re-level the tilt neutral | Short tap on the map (when no bomb is armed) — confirmed by a centred panel |
+| Throw a sound bomb | **Tap** the field where you want it to land |
+| Reveal patrol routes | **Press and hold** the field |
+| Pause menu | **BOOT button** (GPIO0) — holds Re-level and Restart |
 | Menus | Tap |
+
+Throwing resolves on *release*, not on press: until the finger lifts, a tap
+and a hold are the same gesture, and a hold must not also lob a bomb.
+
+Re-levelling and restarting live behind the button rather than on the field.
+They used to compete with it for taps, which is what made throwing need a
+separate arming step.
 
 Speed is a continuous function of tilt angle, not a walk/run toggle: a slight
 lean creeps, a hard lean sprints at 205 px/s. Past `SPRINT_THRESHOLD` your
@@ -77,8 +84,12 @@ Every on-screen element, rendered from the game's own palette and rasteriser:
 The game uses the whole 368x448 panel — there is no HUD strip. The play field
 is 23x28 tiles at 16px, which fills the panel exactly. The handful of things
 that must stay visible float over the field instead of taking a band from it:
-level and hostage tally top-left, tilt bubble bottom-left, bomb control
-bottom-right, and the alert meter climbing the left and right edges.
+level and hostage tally top-left, bombs remaining bottom-right, and the alert
+meter climbing the left and right edges.
+
+When the last hostage is freed and the exit unlocks, a ring far wider than the
+panel collapses onto the exit over 500ms — the one moment worth interrupting
+your attention for, wherever on the screen you happened to be looking.
 
 ## Sound
 

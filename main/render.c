@@ -39,6 +39,22 @@ static void draw_exit(gfx_surf_t *s, const game_t *g)
     const int cx = g->exit_tx * TILE + TILE / 2;
     const int cy = g->exit_ty * TILE + TILE / 2;
 
+    // Unlock reveal: a ring far wider than the panel collapses onto the exit
+    // over half a second, so the moment the way out opens is impossible to
+    // miss no matter where you were looking.
+    if (g->exit_anim > 0.0f) {
+        const float t = g->exit_anim;              // 1 -> 0
+        const float r = 9.0f + (EXIT_REVEAL_R - 9.0f) * t;
+        // Tightens and brightens as it converges.
+        const uint32_t a  = (uint32_t)(6.0f + (1.0f - t) * 22.0f);
+        const int thick   = 2 + (int)((1.0f - t) * 4.0f);
+        gfx_ring(s, cx, cy, (int)r, thick, COL_EXIT, a);
+        if (t < 0.55f) {
+            gfx_ring(s, cx, cy, (int)(r * 1.45f), 2, COL_EXIT,
+                     (uint32_t)(4.0f + (1.0f - t) * 6.0f));
+        }
+    }
+
     if (g->exit_open) {
         const float pulse = 0.5f + 0.5f * sinf(g->level_time * 3.4f);
         gfx_blend_circle(s, cx, cy, 13, COL_EXIT, (uint32_t)(4 + pulse * 5));

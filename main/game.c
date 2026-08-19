@@ -262,10 +262,11 @@ void game_load_level(game_t *g, int idx)
 
     g->bombs_left = L->bombs;
     g->exit_open  = (g->hostage_count == 0);
+    g->exit_anim  = 0.0f;
+    g->menu_open  = false;
     g->level_time = 0.0f;
     g->flash      = 0.0f;
     g->max_alert  = 0.0f;
-    g->aiming     = false;
     memset(&g->bomb, 0, sizeof(g->bomb));
 
     g->phase   = GS_BRIEF;
@@ -342,7 +343,10 @@ static void update_player(game_t *g, float dt, const game_input_t *in)
             g->rescued++;
             g->events |= EV_RESCUE;
             g_spawn_burst(g, h->x, h->y, COL_HOSTAGE, 10, 70.0f);
-            if (g->rescued >= g->hostage_count) g->exit_open = true;
+            if (g->rescued >= g->hostage_count) {
+                g->exit_open = true;
+                g->exit_anim = 1.0f;   // collapse the reveal ring onto the exit
+            }
         }
     }
 
@@ -409,6 +413,16 @@ void game_update(game_t *g, float dt, const game_input_t *in)
 {
     if (dt > 0.05f) dt = 0.05f;      // don't let a stall teleport anyone
     g->events = 0;
+
+    if (in->restart) {
+        game_load_level(g, g->level_idx);
+        g->phase = GS_PLAY;          // straight back in, no briefing
+        return;
+    }
+
+    // With the menu up the world is frozen: no guards, no timers, no alert.
+    if (g->menu_open) return;
+
     g->phase_t += dt;
 
     switch (g->phase) {
@@ -458,6 +472,11 @@ void game_update(game_t *g, float dt, const game_input_t *in)
     }
 
     g->level_time += dt;
+
+    if (g->exit_anim > 0.0f) {
+        g->exit_anim -= dt / EXIT_REVEAL_TIME;
+        if (g->exit_anim < 0.0f) g->exit_anim = 0.0f;
+    }
 
     update_player(g, dt, in);
     if (g->phase != GS_PLAY) return;   // player just reached the exit

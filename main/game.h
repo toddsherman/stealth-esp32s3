@@ -60,6 +60,8 @@ extern "C" {
 #define NOISE_TILES_RUN   4           // flood radius of a sprinting footstep
 #define NOISE_TILES_BOMB  10          // flood radius of a sound bomb
 #define BOMB_FLIGHT_TIME  0.34f
+#define EXIT_REVEAL_TIME  0.50f       // giant ring collapsing onto the exit
+#define EXIT_REVEAL_R     620.0f      // starts wider than the panel diagonal
 
 // ---- Palette (AMOLED: true black background costs no power) ---------------
 #define COL_BG        RGB565(  5,   6,  10)
@@ -161,8 +163,9 @@ typedef struct {
     bool  throw_now;     // release a bomb at (tx, ty)
     float tx, ty;
     bool  tap;           // any fresh tap, for menus
-    bool  arm_toggle;    // bomb button pressed
     bool  recalibrate;   // player asked for the current attitude to be neutral
+    bool  menu_toggle;   // the physical button was pressed
+    bool  restart;       // restart the current level
 } game_input_t;
 
 typedef struct {
@@ -188,8 +191,9 @@ typedef struct {
     float level_time;
     float flash;          // red screen flash on capture
     float max_alert;      // highest live alert, drives the HUD bar
-    bool  aiming;         // bomb armed, next tap picks the target
     bool  reveal_paths;   // finger held down: show the guards' patrol routes
+    bool  menu_open;      // pause menu is up; the simulation is frozen
+    float exit_anim;      // 1 -> 0 while the exit-unlocked ring collapses
 } game_t;
 
 // ---- API ------------------------------------------------------------------
@@ -223,7 +227,8 @@ void hud_reset(void);
 // the unit disc. Passing them in (rather than reading the IMU here) keeps this
 // file free of ESP dependencies so the native preview harness can drive it.
 void hud_build_input(game_input_t *in, const touch_state_t *ts,
-                     float tilt_x, float tilt_y, game_t *g, float dt);
+                     float tilt_x, float tilt_y, bool menu_button,
+                     game_t *g, float dt);
 void hud_render(gfx_surf_t *s, const game_t *g);
 
 #ifdef __cplusplus
