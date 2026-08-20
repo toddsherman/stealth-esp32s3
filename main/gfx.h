@@ -72,6 +72,12 @@ int  gfx_text (gfx_surf_t *s, int x, int y, const char *str, uint16_t c, int sca
 int  gfx_text_w(const char *str, int scale);
 void gfx_text_centered(gfx_surf_t *s, int cx, int y, const char *str, uint16_t c, int scale);
 
+// Largest scale up to max_scale at which str fits in max_w. Level names are
+// drawn as large as they will go, and the longest one clears the panel by
+// only a few pixels - this keeps a longer name from running off the edge
+// rather than relying on nobody ever writing one.
+int  gfx_text_fit_scale(const char *str, int max_w, int max_scale);
+
 extern const uint8_t gfx_font5x7[][5];
 
 #ifdef __cplusplus

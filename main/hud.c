@@ -17,19 +17,19 @@
 #define HOLD_REVEAL_T 0.35f   // hold past this and it is a reveal, not a throw
 #define LEVEL_TOAST_T 1.1f
 
-#define TOAST_W       208
-#define TOAST_H       78
+#define TOAST_W       268
+#define TOAST_H       104
 
-#define BOMB_PIP_X    (PLAY_W - 34)
-#define BOMB_PIP_Y    (PLAY_H - 32)
-#define BOMB_PIP_R    19
+#define BOMB_PIP_X    (PLAY_W - 38)
+#define BOMB_PIP_Y    (PLAY_H - 36)
+#define BOMB_PIP_R    23
 
-#define MENU_W        252
-#define MENU_H        222
+#define MENU_W        292
+#define MENU_H        268
 #define MENU_X        ((PLAY_W - MENU_W) / 2)
 #define MENU_Y        ((PLAY_H - MENU_H) / 2)
-#define MENU_ROW_H    50
-#define MENU_ROW0_Y   (MENU_Y + 58)
+#define MENU_ROW_H    60
+#define MENU_ROW0_Y   (MENU_Y + 66)
 #define MENU_ITEMS    3
 
 static const char *s_menu_labels[MENU_ITEMS] = {
@@ -183,14 +183,14 @@ static void draw_toast(gfx_surf_t *s)
 
     gfx_blend_rect(s, x, y, TOAST_W, TOAST_H, RGB565(6, 10, 16), (uint32_t)(26.0f * f));
     gfx_rect_frame(s, x, y, TOAST_W, TOAST_H, 1, COL_PLAYER_D);
-    gfx_text_centered(s, PLAY_W / 2, y + 20, "LEVELLED", COL_PLAYER, 3);
-    gfx_text_centered(s, PLAY_W / 2, y + 52, "TILT NEUTRAL SET", COL_TEXT_DIM, 1);
+    gfx_text_centered(s, PLAY_W / 2, y + 22, "LEVELLED", COL_PLAYER, 4);
+    gfx_text_centered(s, PLAY_W / 2, y + 66, "TILT NEUTRAL SET", COL_TEXT_DIM, 2);
 }
 
 static void draw_reveal_label(gfx_surf_t *s, const game_t *g)
 {
     if (!g->reveal_paths) return;
-    gfx_text_centered(s, PLAY_W / 2, PLAY_H - 16, "PATROL ROUTES", COL_TEXT_DIM, 1);
+    gfx_text_centered(s, PLAY_W / 2, PLAY_H - 22, "PATROL ROUTES", COL_TEXT_DIM, 2);
 }
 
 static void draw_menu(gfx_surf_t *s, const game_t *g)
@@ -200,19 +200,19 @@ static void draw_menu(gfx_surf_t *s, const game_t *g)
     gfx_blend_rect(s, 0, 0, PLAY_W, PLAY_H, RGB565(0, 0, 0), 20);
     gfx_blend_rect(s, MENU_X, MENU_Y, MENU_W, MENU_H, RGB565(6, 10, 16), 30);
     gfx_rect_frame(s, MENU_X, MENU_Y, MENU_W, MENU_H, 1, COL_PLAYER_D);
-    gfx_text_centered(s, PLAY_W / 2, MENU_Y + 20, "PAUSED", COL_TEXT_DIM, 2);
+    gfx_text_centered(s, PLAY_W / 2, MENU_Y + 22, "PAUSED", COL_TEXT_DIM, 3);
 
     for (int i = 0; i < MENU_ITEMS; i++) {
         const int ry = MENU_ROW0_Y + i * MENU_ROW_H;
-        gfx_blend_rect(s, MENU_X + 12, ry, MENU_W - 24, MENU_ROW_H - 8,
+        gfx_blend_rect(s, MENU_X + 14, ry, MENU_W - 28, MENU_ROW_H - 10,
                        COL_PLAYER, 4);
-        gfx_rect_frame(s, MENU_X + 12, ry, MENU_W - 24, MENU_ROW_H - 8, 1,
+        gfx_rect_frame(s, MENU_X + 14, ry, MENU_W - 28, MENU_ROW_H - 10, 1,
                        COL_PLAYER_D);
-        gfx_text_centered(s, PLAY_W / 2, ry + 13, s_menu_labels[i], COL_PLAYER, 3);
+        gfx_text_centered(s, PLAY_W / 2, ry + 11, s_menu_labels[i], COL_PLAYER, 4);
     }
 
-    gfx_text_centered(s, PLAY_W / 2, MENU_Y + MENU_H - 16,
-                      "BUTTON TO CLOSE", COL_TEXT_DIM, 1);
+    gfx_text_centered(s, PLAY_W / 2, MENU_Y + MENU_H - 24,
+                      "BUTTON TO CLOSE", COL_TEXT_DIM, 2);
 }
 
 void hud_render(gfx_surf_t *s, const game_t *g)
@@ -225,12 +225,12 @@ void hud_render(gfx_surf_t *s, const game_t *g)
 
         // Top-left: level, then the hostage tally under it.
         snprintf(buf, sizeof(buf), "%02d %s", g->level_idx + 1, g->lvl->name);
-        gfx_text(s, 12, 8, buf, COL_TEXT_DIM, 1);
+        gfx_text(s, 12, 10, buf, COL_TEXT_DIM, 2);
 
         for (int i = 0; i < g->hostage_count; i++) {
-            const int cx = 16 + i * 15, cy = 26;
-            if (i < g->rescued) gfx_fill_circle(s, cx, cy, 5, COL_HOSTAGE);
-            else                gfx_ring(s, cx, cy, 5, 2, COL_HOSTAGE, 16);
+            const int cx = 18 + i * 18, cy = 44;
+            if (i < g->rescued) gfx_fill_circle(s, cx, cy, 6, COL_HOSTAGE);
+            else                gfx_ring(s, cx, cy, 6, 2, COL_HOSTAGE, 16);
         }
 
         // Bottom-right: bombs remaining. A readout, not a control - throwing
@@ -240,7 +240,7 @@ void hud_render(gfx_surf_t *s, const game_t *g)
         gfx_blend_circle(s, BOMB_PIP_X, BOMB_PIP_Y, BOMB_PIP_R, RGB565(4, 6, 10), 20);
         gfx_ring(s, BOMB_PIP_X, BOMB_PIP_Y, BOMB_PIP_R, 2, bc, usable ? 26 : 12);
         snprintf(buf, sizeof(buf), "%d", g->bombs_left);
-        gfx_text_centered(s, BOMB_PIP_X, BOMB_PIP_Y - 7, buf, bc, 2);
+        gfx_text_centered(s, BOMB_PIP_X, BOMB_PIP_Y - 10, buf, bc, 3);
     }
 
     draw_toast(s);

@@ -269,3 +269,11 @@ void gfx_text_centered(gfx_surf_t *s, int cx, int y, const char *str, uint16_t c
 {
     gfx_text(s, cx - gfx_text_w(str, scale) / 2, y, str, c, scale);
 }
+
+int gfx_text_fit_scale(const char *str, int max_w, int max_scale)
+{
+    for (int sc = max_scale; sc > 1; sc--) {
+        if (gfx_text_w(str, sc) <= max_w) return sc;
+    }
+    return 1;
+}

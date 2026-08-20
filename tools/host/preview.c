@@ -229,12 +229,30 @@ int main(int argc, char **argv)
     printf("caught screen: phase=%d (4 = GS_CAUGHT expected 3)\n", (int)g.phase);
 
     reset_inputs();
-    // --- the centred re-level popup ---
+    // --- the centred re-level popup, now reached through the menu ---
+    reset_inputs();
     game_load_level(&g, 0);
     tap(&g, 184, 320);
-    sim(&g, 1.0f, NULL);
-    tap(&g, 184, 220);              // short tap on the map = re-level
-    sim(&g, 0.15f, NULL);
+    sim(&g, 0.5f, NULL);
+    {
+        game_input_t in = {0};
+        touch_state_t ts = {0};
+        const float dt = 1.0f / 60.0f;
+        hud_build_input(&in, &ts, 0.0f, 0.0f, true, &g, dt);   // button opens
+        game_update(&g, dt, &in);
+
+        // Tap the RE-LEVEL row: menu is centred, second row of three.
+        const int menu_y = (448 - 268) / 2;
+        const int row1_y = menu_y + 66 + 60 + 20;
+        ts.down = true; ts.pressed = true; ts.x = 184; ts.y = (int16_t)row1_y;
+        hud_build_input(&in, &ts, 0.0f, 0.0f, false, &g, dt);
+        game_update(&g, dt, &in);
+        printf("relevel via menu: recalibrate=%d menu_open=%d\n",
+               in.recalibrate ? 1 : 0, g.menu_open ? 1 : 0);
+
+        memset(&ts, 0, sizeof(ts));
+        sim(&g, 0.12f, NULL);
+    }
     render_to_fb(&g);
     snprintf(path, sizeof(path), "%s/10_levelled.ppm", outdir);
     write_ppm(path);
