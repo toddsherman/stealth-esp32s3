@@ -223,14 +223,6 @@ void hud_render(gfx_surf_t *s, const game_t *g)
     if (g->phase != GS_TITLE && g->phase != GS_WIN) {
         char buf[32];
 
-        // Top-left: just the hostage tally. The level name is on the
-        // briefing screen; repeating it here only crowded the field.
-        for (int i = 0; i < g->hostage_count; i++) {
-            const int cx = 18 + i * 18, cy = 22;
-            if (i < g->rescued) gfx_fill_circle(s, cx, cy, 6, COL_HOSTAGE);
-            else                gfx_ring(s, cx, cy, 6, 2, COL_HOSTAGE, 16);
-        }
-
         // Bottom-right: bombs remaining. A readout, not a control - throwing
         // is a tap on the field now.
         const bool usable = (g->bombs_left > 0);

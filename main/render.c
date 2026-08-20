@@ -312,8 +312,13 @@ static void draw_overlay(gfx_surf_t *s, const game_t *g)
         gfx_text_centered(s, PLAY_W / 2, 192, g->lvl->name, COL_PLAYER,
                           gfx_text_fit_scale(g->lvl->name, PLAY_W - 16, 5));
 
+        // The objective, in the hostages' own colour so it reads as the thing
+        // you are looking for once the level starts.
+        snprintf(buf, sizeof(buf), "RESCUE %d", g->hostage_count);
+        gfx_text_centered(s, PLAY_W / 2, 250, buf, COL_HOSTAGE, 4);
+
         if (fmodf(g->phase_t, 1.2f) < 0.7f) {
-            gfx_text_centered(s, PLAY_W / 2, 296, "TAP TO START", COL_PLAYER, 4);
+            gfx_text_centered(s, PLAY_W / 2, 310, "TAP TO START", COL_PLAYER, 4);
         }
         break;
     }
