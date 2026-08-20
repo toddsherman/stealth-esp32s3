@@ -155,6 +155,9 @@ static void voice_start(vshape_t shape, float f0, float f1, float amp,
         }
     }
 
+    // A zero-length voice would make lin_step infinite and env_mul NaN, and
+    // the NaN would propagate through the mix into every other voice.
+    if (dur < 0.001f) dur = 0.001f;
     const float samples = dur * (float)s_rate;
     slot->active     = true;
     slot->shape      = shape;

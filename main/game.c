@@ -245,7 +245,9 @@ void game_load_level(game_t *g, int idx)
         }
     }
 
-    g->guard_count = L->guard_count;
+    // Clamp rather than trust the table. The generator caps at MAX_GUARDS, but
+    // a hand-edited level with one guard too many would write past g->guards.
+    g->guard_count = (L->guard_count > MAX_GUARDS) ? MAX_GUARDS : L->guard_count;
     for (int i = 0; i < g->guard_count; i++) {
         const guard_def_t *gd = &L->guards[i];
         guard_t *gu = &g->guards[i];

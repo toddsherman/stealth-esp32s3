@@ -132,7 +132,10 @@ static void build_routes(const game_t *g)
             const int a = seg;
             const int b = (seg + 1) % def->wp_count;
 
-            uint8_t px[GRID_W * GRID_H], py[GRID_W * GRID_H];
+            // Static, not stack: these are 644 bytes each and sat inside two
+            // nested loops on the main task, which also carries the whole
+            // render call chain. Single-threaded, so sharing them is safe.
+            static uint8_t px[GRID_W * GRID_H], py[GRID_W * GRID_H];
             const int n = g_find_path(g, def->wx[a], def->wy[a],
                                       def->wx[b], def->wy[b],
                                       px, py, GRID_W * GRID_H);

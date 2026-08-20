@@ -16,6 +16,19 @@ static bool  s_ok;
 static float s_ax, s_ay, s_az;      // filtered, m/s^2
 static float s_ref_x, s_ref_y;      // orientation treated as neutral
 static bool  s_levelled;
+static int   s_fail_run;        // consecutive failed reads
+
+// If the sensor stops answering, decay the reading to neutral. Holding the
+// last tilt would leave the player walking in one direction indefinitely with
+// no way to stop, which is worse than not moving at all.
+#define IMU_FAIL_LIMIT 30
+
+static void imu_note_failure(void)
+{
+    if (++s_fail_run < IMU_FAIL_LIMIT) return;
+    s_ax = s_ref_x;
+    s_ay = s_ref_y;
+}
 
 esp_err_t imu_init(void)
 {
@@ -60,10 +73,18 @@ void imu_poll(void)
     if (!s_ok) return;
 
     bool ready = false;
-    if (qmi8658_is_data_ready(&s_dev, &ready) != ESP_OK || !ready) return;
+    if (qmi8658_is_data_ready(&s_dev, &ready) != ESP_OK) {
+        imu_note_failure();
+        return;
+    }
+    if (!ready) return;          // not an error, just no new sample yet
 
     qmi8658_data_t d = {0};
-    if (qmi8658_read_sensor_data(&s_dev, &d) != ESP_OK) return;
+    if (qmi8658_read_sensor_data(&s_dev, &d) != ESP_OK) {
+        imu_note_failure();
+        return;
+    }
+    s_fail_run = 0;
 
     // Exponential low-pass: the hand is never quite still, and an unfiltered
     // reading makes the player jitter even when the board is held steady.

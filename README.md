@@ -218,7 +218,8 @@ hostages), measured on device:
 | Rasterising (4 bands) | 6.7 ms |
 | QSPI DMA wait | 9.5 ms |
 | Binary | 294 KB (81% of the partition free) |
-| Internal heap free | 258 KB |
+| Internal heap free | 110 KB |
+| Main task stack peak | 2.4 KB of 8 KB |
 
 Measured on the heaviest stage with the alert meter active. Three changes took
 it from 34.5 to 50 FPS:
@@ -278,6 +279,11 @@ It checks row widths, sealed borders, exactly one spawn and exit, and — via
 flood fill — that every hostage, the exit, and every guard waypoint is
 actually reachable from the player's start.
 
+`tools/host/soak.c` runs 108,000 simulated frames across a dozen stages and
+four minutes of audio, checking for NaN, infinities and out-of-bounds
+positions — the kind of accumulated float drift that only appears in a long
+session and never in a short test.
+
 `tools/host/smoke.c` loads and simulates every stage, and asserts that no
 guard can see the player at the moment a stage begins. That check caught a
 generated stage which spotted and captured the player within 1.5 seconds of
@@ -297,6 +303,29 @@ clang -O2 -std=c11 -I main -I tools/host tools/host/preview.c \
   main/gfx.c main/font.c main/game.c main/guard.c main/level.c \
   main/render.c main/hud.c -lm -o /tmp/stealth_preview && /tmp/stealth_preview /tmp/shots
 ```
+
+## Failure handling
+
+A handheld device that wedges has to be power-cycled, so the paths that could
+hang or run away are bounded rather than trusted:
+
+- The wait for a panel transfer is bounded, not `portMAX_DELAY`. Only the
+  transfer-complete callback gives that semaphore, so a transfer that never
+  finishes would otherwise wedge the game permanently. A failed
+  `draw_bitmap` also hands the token back, since no callback will arrive for
+  a transfer that was never queued.
+- If the IMU stops answering, tilt decays to neutral instead of holding its
+  last value — a stuck reading would walk the player into a wall forever with
+  no way to stop.
+- The touch read uses an 8ms timeout because it sits inside the frame loop; at
+  50fps a wedged controller holding the bus for 20ms would halve the framerate
+  rather than drop one sample.
+- Guard counts from level data are clamped to `MAX_GUARDS` rather than
+  trusted, and a zero-length synth voice is clamped before it can divide by
+  zero and push a NaN through the whole mix.
+
+The `i2s_common: i2s_channel_disable` error logged once at boot comes from the
+codec framework closing a channel it has not opened yet. It is benign.
 
 ## Possible next steps
 

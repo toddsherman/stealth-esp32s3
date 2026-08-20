@@ -34,7 +34,10 @@ static bool read_point(int16_t *x, int16_t *y)
     if (!s_dev) return false;
 
     uint8_t reg = 0x02, buf[5];
-    if (i2c_master_transmit_receive(s_dev, &reg, 1, buf, sizeof(buf), 20) != ESP_OK) {
+    // 8ms, not 20: this runs inside the frame loop, and at 50fps a wedged
+    // controller holding the bus for 20ms would halve the framerate rather
+    // than simply dropping one sample.
+    if (i2c_master_transmit_receive(s_dev, &reg, 1, buf, sizeof(buf), 8) != ESP_OK) {
         return false;
     }
     if ((buf[0] & 0x0F) == 0) return false;

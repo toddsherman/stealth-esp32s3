@@ -13,8 +13,10 @@
 //
 // Band height is a tradeoff: every band costs a synchronous window-set round
 // trip to the panel before its pixels can stream, so fewer, larger bands mean
-// less protocol overhead and longer uninterrupted DMA runs. 64 rows is 47KB
-// per buffer, 94KB for the pair, which internal RAM has room for.
+// less protocol overhead and longer uninterrupted DMA runs. Measured on this
+// board, going from 14 bands to 4 was worth 34.5 -> 50 FPS - more than every
+// CPU-side optimisation combined. 112 rows is 82KB per buffer, 161KB for the
+// pair, which internal RAM has room for.
 #include <stdio.h>
 #include <string.h>
 
@@ -220,9 +222,28 @@ void app_main(void)
             game_render(&surf, &game);
 
             // Wait for the previous band to finish before reusing its buffer.
-            xSemaphoreTake(s_flush_done, portMAX_DELAY);
-            esp_lcd_panel_draw_bitmap(board_panel(), 0, b * BAND_H,
-                                      LCD_H_RES, (b + 1) * BAND_H, s_band[cur]);
+            //
+            // Bounded, not portMAX_DELAY. The only thing that gives this
+            // semaphore is the panel's transfer-complete callback, so a
+            // transfer that never completes would otherwise wedge the game
+            // permanently with no way back. A band period is ~5ms; 250ms means
+            // something is genuinely wrong, and pressing on costs at worst one
+            // torn band rather than a dead device.
+            if (xSemaphoreTake(s_flush_done, pdMS_TO_TICKS(250)) != pdTRUE) {
+                ESP_LOGW(TAG, "panel flush timed out on band %d, continuing", b);
+            }
+
+            const esp_err_t derr = esp_lcd_panel_draw_bitmap(
+                board_panel(), 0, b * BAND_H,
+                LCD_H_RES, (b + 1) * BAND_H, s_band[cur]);
+            if (derr != ESP_OK) {
+                // No transfer was queued, so no callback will arrive. Hand the
+                // token back or the next wait blocks on a completion that can
+                // never happen.
+                ESP_LOGE(TAG, "draw_bitmap band %d failed: %s", b,
+                         esp_err_to_name(derr));
+                xSemaphoreGive(s_flush_done);
+            }
             cur ^= 1;
         }
 
@@ -238,7 +259,7 @@ void app_main(void)
             ESP_LOGI(TAG, "fps=%.1f frame=%lums phase=%d lvl=%d touch=%s(%d,%d) "
                           "btn=%s menu=%d "
                           "tilt=(%+.2f,%+.2f) accel=(%+.2f,%+.2f,%+.2f) "
-                          "alert=%.2f rescued=%d/%d bombs=%d heap_int=%u",
+                          "alert=%.2f rescued=%d/%d bombs=%d heap_int=%u stack_free=%u",
                      (double)fps, (unsigned long)(frame_us / 1000),
                      (int)game.phase, game.level_idx + 1,
                      touch.down ? "DOWN" : "up", touch.x, touch.y,
@@ -247,7 +268,8 @@ void app_main(void)
                      (double)rax, (double)ray, (double)raz,
                      (double)game.max_alert, game.rescued, game.hostage_count,
                      game.bombs_left,
-                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+                     (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                     (unsigned)uxTaskGetStackHighWaterMark(NULL));
         }
 
         vTaskDelay(1);   // let the idle task run; the last band is still flying

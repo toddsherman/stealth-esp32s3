@@ -41,7 +41,12 @@ static void audio_task(void *arg)
     static int16_t buf[FRAMES];
     for (;;) {
         synth_render(buf, FRAMES);
-        esp_codec_dev_write(s_dev, buf, sizeof(buf));
+        if (esp_codec_dev_write(s_dev, buf, sizeof(buf)) != 0) {
+            // The write normally blocks until the I2S buffer drains, which is
+            // what paces this loop. If it starts failing instead of blocking,
+            // yield rather than spinning a core flat out.
+            vTaskDelay(pdMS_TO_TICKS(5));
+        }
     }
 }
 
@@ -65,7 +70,9 @@ esp_err_t audio_init(void)
     };
     ESP_RETURN_ON_ERROR(i2s_channel_init_std_mode(s_tx, &std_cfg), TAG, "i2s std");
 
-    const audio_codec_i2s_cfg_t i2s_if_cfg = { .port = I2S_NUM_0, .tx_handle = s_tx };
+    // Not const: these are handed to APIs that take non-const pointers, and a
+    // const-qualified object written through such a pointer is undefined.
+    audio_codec_i2s_cfg_t i2s_if_cfg = { .port = I2S_NUM_0, .tx_handle = s_tx };
     const audio_codec_data_if_t *data_if = audio_codec_new_i2s_data(&i2s_if_cfg);
     ESP_RETURN_ON_FALSE(data_if, ESP_FAIL, TAG, "i2s data if");
 
@@ -80,7 +87,7 @@ esp_err_t audio_init(void)
     const audio_codec_gpio_if_t *gpio_if = audio_codec_new_gpio();
     ESP_RETURN_ON_FALSE(gpio_if, ESP_FAIL, TAG, "gpio if");
 
-    const es8311_codec_cfg_t es_cfg = {
+    es8311_codec_cfg_t es_cfg = {
         .ctrl_if     = ctrl_if,
         .gpio_if     = gpio_if,
         .codec_mode  = ESP_CODEC_DEV_WORK_MODE_DAC,
@@ -91,7 +98,7 @@ esp_err_t audio_init(void)
     const audio_codec_if_t *codec_if = es8311_codec_new(&es_cfg);
     ESP_RETURN_ON_FALSE(codec_if, ESP_FAIL, TAG, "es8311");
 
-    const esp_codec_dev_cfg_t dev_cfg = {
+    esp_codec_dev_cfg_t dev_cfg = {
         .dev_type = ESP_CODEC_DEV_TYPE_OUT,
         .codec_if = codec_if,
         .data_if  = data_if,
