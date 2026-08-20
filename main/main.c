@@ -152,7 +152,18 @@ void app_main(void)
                      (input.menu_row >= 0 && input.menu_row < 4)
                          ? rows[input.menu_row] : "MISS");
         }
+        const phase_t phase_before = game.phase;
         game_update(&game, dt, &input);
+
+        // Every screen change is logged. When a control appears to do nothing
+        // or to go somewhere unexpected, this line settles it immediately
+        // rather than requiring a guess about what the input did.
+        if (game.phase != phase_before) {
+            static const char *PN[] = { "INITIALS", "TITLE", "BRIEF", "PLAY",
+                                        "CAUGHT", "CLEAR", "WIN" };
+            ESP_LOGI(TAG, "phase %s -> %s (stage %d)",
+                     PN[phase_before], PN[game.phase], game.level_idx + 1);
+        }
 
         // Drain the simulation's one-shot events into sound.
         if (game.events & EV_BOMB_THROW) audio_sfx(SFX_BOMB_THROW);
