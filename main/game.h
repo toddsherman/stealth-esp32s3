@@ -242,12 +242,24 @@ void hud_reset(void);
 
 // Initials entry: an A-Z grid the player taps. The layout lives here so the
 // drawn keys and the hit test cannot disagree about where a key is.
+//
+// The two letter slots and the GO key share one compact row at the top, which
+// leaves the rest of the panel for the keys themselves - they are the thing
+// being aimed at, so they get the space.
+#define INIT_SLOT_Y   34
+#define INIT_SLOT_W   76
+#define INIT_SLOT_H   84
+#define INIT_SLOT_X0  54
+#define INIT_SLOT_PITCH 84
+#define INIT_GO_X     222
+#define INIT_GO_W     92
+
 #define INIT_COLS    6
 #define INIT_ROWS    5
 #define INIT_CELL_W  58
-#define INIT_CELL_H  46
+#define INIT_CELL_H  60
 #define INIT_GRID_X  ((PLAY_W - INIT_COLS * INIT_CELL_W) / 2)
-#define INIT_GRID_Y  212
+#define INIT_GRID_Y  134
 void initials_render(gfx_surf_t *s, const game_t *g);
 void initials_input(game_t *g, const touch_state_t *ts, game_input_t *in);
 // tilt_x / tilt_y come from the IMU, already in screen space and clamped to

@@ -144,45 +144,47 @@ void hud_build_input(game_input_t *in, const touch_state_t *ts,
 
 // ---- Initials entry -------------------------------------------------------
 
-// 26 letters fill the first four rows and the start of the fifth; the two
-// cells left over on the last row become the confirm key.
+// Six letters per row for four rows, then Y and Z centred on the last one -
+// left-aligning two keys under a full row looks like a mistake.
 static char init_key_at(int col, int row)
 {
-    const int i = row * INIT_COLS + col;
-    if (i < 26) return (char)('A' + i);
+    if (row < 4) {
+        const int i = row * INIT_COLS + col;
+        return (i < 26) ? (char)('A' + i) : 0;
+    }
+    if (col == 2) return 'Y';
+    if (col == 3) return 'Z';
     return 0;
 }
 
-static bool init_in_start(int x, int y)
+static bool init_in_go(int x, int y)
 {
-    const int gx = INIT_GRID_X + 2 * INIT_CELL_W;
-    const int gy = INIT_GRID_Y + 4 * INIT_CELL_H;
-    return in_rect(x, y, gx, gy, 4 * INIT_CELL_W, INIT_CELL_H);
+    return in_rect(x, y, INIT_GO_X, INIT_SLOT_Y, INIT_GO_W, INIT_SLOT_H);
 }
 
 void initials_input(game_t *g, const touch_state_t *ts, game_input_t *in)
 {
     if (!ts->pressed) return;
 
-    if (init_in_start(ts->x, ts->y)) {
+    if (init_in_go(ts->x, ts->y)) {
         in->initials_done = true;
         return;
     }
 
-    // The two letter slots are tappable, so a mistyped first letter can be
-    // corrected without cycling all the way round.
+    // The slots are tappable, so a mistyped first letter can be corrected
+    // without cycling all the way round.
     for (int i = 0; i < 2; i++) {
-        const int bx = PLAY_W / 2 - 78 + i * 82;
-        if (in_rect(ts->x, ts->y, bx, 104, 74, 84)) {
+        const int bx = INIT_SLOT_X0 + i * INIT_SLOT_PITCH;
+        if (in_rect(ts->x, ts->y, bx, INIT_SLOT_Y, INIT_SLOT_W, INIT_SLOT_H)) {
             g->initials_cursor = (uint8_t)i;
             return;
         }
     }
 
+    if (ts->x < INIT_GRID_X || ts->y < INIT_GRID_Y) return;
     const int col = (ts->x - INIT_GRID_X) / INIT_CELL_W;
     const int row = (ts->y - INIT_GRID_Y) / INIT_CELL_H;
     if (col < 0 || col >= INIT_COLS || row < 0 || row >= INIT_ROWS) return;
-    if (ts->x < INIT_GRID_X || ts->y < INIT_GRID_Y) return;
 
     const char c = init_key_at(col, row);
     if (!c) return;
@@ -194,19 +196,25 @@ void initials_input(game_t *g, const touch_state_t *ts, game_input_t *in)
 void initials_render(gfx_surf_t *s, const game_t *g)
 {
     gfx_fill_rect(s, 0, 0, PLAY_W, PLAY_H, COL_BG);
-    gfx_text_centered(s, PLAY_W / 2, 34, "WHO IS PLAYING", COL_TEXT, 3);
-    gfx_text_centered(s, PLAY_W / 2, 68, "TWO INITIALS FOR THE SCOREBOARD",
-                      COL_TEXT_DIM, 1);
+    gfx_text_centered(s, PLAY_W / 2, 10, "INITIALS", COL_TEXT_DIM, 2);
 
     for (int i = 0; i < 2; i++) {
-        const int bx = PLAY_W / 2 - 78 + i * 82;
+        const int bx = INIT_SLOT_X0 + i * INIT_SLOT_PITCH;
         const bool active = (g->initials_cursor == i);
-        gfx_blend_rect(s, bx, 104, 74, 84, COL_PLAYER, active ? 7 : 3);
-        gfx_rect_frame(s, bx, 104, 74, 84, active ? 2 : 1,
-                       active ? COL_PLAYER : COL_PLAYER_D);
+        gfx_blend_rect(s, bx, INIT_SLOT_Y, INIT_SLOT_W, INIT_SLOT_H,
+                       COL_PLAYER, active ? 7 : 3);
+        gfx_rect_frame(s, bx, INIT_SLOT_Y, INIT_SLOT_W, INIT_SLOT_H,
+                       active ? 2 : 1, active ? COL_PLAYER : COL_PLAYER_D);
         const char t[2] = { g->initials[i], 0 };
-        gfx_text_centered(s, bx + 37, 126, t, COL_PLAYER, 6);
+        gfx_text_centered(s, bx + INIT_SLOT_W / 2, INIT_SLOT_Y + 18, t,
+                          COL_PLAYER, 7);
     }
+
+    // GO sits beside the second slot rather than eating a row of keys.
+    gfx_blend_rect(s, INIT_GO_X, INIT_SLOT_Y, INIT_GO_W, INIT_SLOT_H, COL_EXIT, 7);
+    gfx_rect_frame(s, INIT_GO_X, INIT_SLOT_Y, INIT_GO_W, INIT_SLOT_H, 2, COL_EXIT);
+    gfx_text_centered(s, INIT_GO_X + INIT_GO_W / 2, INIT_SLOT_Y + 25, "GO",
+                      COL_EXIT, 6);
 
     for (int row = 0; row < INIT_ROWS; row++) {
         for (int col = 0; col < INIT_COLS; col++) {
@@ -217,17 +225,9 @@ void initials_render(gfx_surf_t *s, const game_t *g)
             gfx_blend_rect(s, x + 2, y + 2, INIT_CELL_W - 4, INIT_CELL_H - 4,
                            COL_TEXT_DIM, 4);
             const char t[2] = { c, 0 };
-            gfx_text_centered(s, x + INIT_CELL_W / 2, y + 13, t, COL_TEXT, 3);
+            gfx_text_centered(s, x + INIT_CELL_W / 2, y + 13, t, COL_TEXT, 5);
         }
     }
-
-    const int sx = INIT_GRID_X + 2 * INIT_CELL_W;
-    const int sy = INIT_GRID_Y + 4 * INIT_CELL_H;
-    gfx_blend_rect(s, sx + 2, sy + 2, 4 * INIT_CELL_W - 4, INIT_CELL_H - 4,
-                   COL_EXIT, 6);
-    gfx_rect_frame(s, sx + 2, sy + 2, 4 * INIT_CELL_W - 4, INIT_CELL_H - 4, 1,
-                   COL_EXIT);
-    gfx_text_centered(s, sx + 2 * INIT_CELL_W, sy + 13, "START", COL_EXIT, 3);
 }
 
 // ---- Drawing --------------------------------------------------------------

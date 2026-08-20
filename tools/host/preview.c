@@ -102,13 +102,13 @@ int main(int argc, char **argv)
     write_ppm(path);
 
     // Tap N, then S, then START.
-    tap(&g, INIT_GRID_X + 1 * INIT_CELL_W + 29, INIT_GRID_Y + 2 * INIT_CELL_H + 23); // N
-    tap(&g, INIT_GRID_X + 0 * INIT_CELL_W + 29, INIT_GRID_Y + 3 * INIT_CELL_H + 23); // S
+    tap(&g, INIT_GRID_X + 1 * INIT_CELL_W + 29, INIT_GRID_Y + 2 * INIT_CELL_H + 30); // N
+    tap(&g, INIT_GRID_X + 0 * INIT_CELL_W + 29, INIT_GRID_Y + 3 * INIT_CELL_H + 30); // S
     render_to_fb(&g);
     snprintf(path, sizeof(path), "%s/00b_initials.ppm", outdir);
     write_ppm(path);
     printf("initials entered: %s\n", g.initials);
-    tap(&g, PLAY_W / 2, INIT_GRID_Y + 4 * INIT_CELL_H + 23);   // START
+    tap(&g, INIT_GO_X + INIT_GO_W / 2, INIT_SLOT_Y + INIT_SLOT_H / 2);   // GO
     printf("phase after START: %d (1 = GS_TITLE)\n", (int)g.phase);
 
     // --- title ---
