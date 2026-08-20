@@ -423,8 +423,11 @@ void game_update(game_t *g, float dt, const game_input_t *in)
     }
 
     if (in->quit) {
-        game_load_level(g, g->level_idx);   // reset the stage behind the menu
-        g->phase   = GS_TITLE;
+        // Back to the very start: whoever picks the board up next enters
+        // their own initials rather than inheriting the last player's.
+        game_load_level(g, 0);
+        g->initials_cursor = 0;
+        g->phase   = GS_INITIALS;
         g->phase_t = 0.0f;
         return;
     }

@@ -40,7 +40,7 @@ sight.
 | Move | **Tilt the board.** Speed rises continuously with the angle |
 | Throw a sound bomb | **Tap** the field where you want it to land |
 | Reveal patrol routes | **Press and hold** the field |
-| Pause menu | **BOOT button** (GPIO0) — holds Re-level and Restart |
+| Pause menu | **BOOT button** (GPIO0), on any screen — Resume, Re-level, Restart, Quit |
 | Menus | Tap |
 
 Throwing resolves on *release*, not on press: until the finger lifts, a tap
@@ -48,7 +48,8 @@ and a hold are the same gesture, and a hold must not also lob a bomb.
 
 Re-levelling and restarting live behind the button rather than on the field.
 They used to compete with it for taps, which is what made throwing need a
-separate arming step.
+separate arming step. Quit returns to the initials screen, so the next person
+to pick the board up enters their own rather than inheriting the last one.
 
 Speed is a continuous function of tilt angle, not a walk/run toggle: a slight
 lean creeps, a hard lean sprints at 205 px/s. Past `SPRINT_THRESHOLD` your

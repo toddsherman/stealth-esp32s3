@@ -80,17 +80,15 @@ void hud_build_input(game_input_t *in, const touch_state_t *ts,
 
     if (s_toast_t > 0.0f) s_toast_t -= dt;
 
+    // The initials screen owns its own input; the menu is not reachable from
+    // it because QUIT lands there anyway.
     if (g->phase == GS_INITIALS) {
+        g->menu_open = false;
         initials_input(g, ts, in);
         return;
     }
 
-    if (g->phase != GS_PLAY) {
-        g->menu_open = false;
-        s_holding = false;
-        return;
-    }
-
+    // The menu button works on every other screen, not just during play.
     if (menu_button) {
         g->menu_open = !g->menu_open;
         s_holding = false;
@@ -125,6 +123,7 @@ void hud_build_input(game_input_t *in, const touch_state_t *ts,
             default:
                 break;      // tapping outside the rows does nothing
             }
+            in->tap = false;   // consumed by the menu, not by the screen
         }
         return;             // frozen: no movement, no throwing
     }
@@ -303,8 +302,10 @@ static void draw_menu(gfx_surf_t *s, const game_t *g)
 {
     if (!g->menu_open) return;
 
-    gfx_blend_rect(s, 0, 0, PLAY_W, PLAY_H, RGB565(0, 0, 0), 20);
-    gfx_blend_rect(s, MENU_X, MENU_Y, MENU_W, MENU_H, RGB565(6, 10, 16), 30);
+    gfx_blend_rect(s, 0, 0, PLAY_W, PLAY_H, RGB565(0, 0, 0), 22);
+    // Solid, not blended: the menu now opens over the title and result
+    // screens too, and bright text underneath was reading through it.
+    gfx_fill_rect(s, MENU_X, MENU_Y, MENU_W, MENU_H, RGB565(6, 10, 16));
     gfx_rect_frame(s, MENU_X, MENU_Y, MENU_W, MENU_H, 1, COL_PLAYER_D);
     gfx_text_centered(s, PLAY_W / 2, MENU_Y + 22, "PAUSED", COL_TEXT_DIM, 3);
 
