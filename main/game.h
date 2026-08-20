@@ -30,6 +30,11 @@ extern "C" {
 #define MAX_WAYPOINTS   6
 #define MAX_PARTICLES   48
 
+// The panel is a rounded rectangle: 28.70mm of glass across 368px is
+// 12.8px/mm, and the corner measures about 4mm, so ~52px. Anything drawn
+// outside this curve sits under the bezel and is never seen.
+#define SCREEN_CORNER_R 52
+
 // ---- Tuning ---------------------------------------------------------------
 #define PLAYER_R          5.0f
 // Speed rises continuously with tilt angle rather than stepping between a

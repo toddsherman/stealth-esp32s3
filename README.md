@@ -23,10 +23,11 @@ there", their cone turns hot and an alarm stabs — the same `detecting` flag
 drives both, so the sound always lands on the frame you see the colour change.
 
 Detection is a meter, not a trigger. Being clipped by the edge of a cone for a
-moment is survivable; standing in the middle of one is not. The meter climbs
-two columns up the left and right edges of the screen — when they reach the
-top you have been identified — so it reads in peripheral vision without
-looking away from the guard about to see you. You can hear it happening too:
+moment is survivable; standing in the middle of one is not. The meter traces
+the panel's own outline: it starts at bottom centre, runs outward both ways,
+rounds the lower corners, climbs both sides, rounds the upper corners, and the
+two ends meet at top centre at the instant you are identified. It reads in
+peripheral vision without looking away from the guard about to see you. You can hear it happening too:
 the heartbeat's rate and volume both track the closest guard's certainty.
 
 Once you *are* seen, running is not an escape. A chasing guard moves at least
@@ -112,8 +113,12 @@ Every on-screen element, rendered from the game's own palette and rasteriser:
 The game uses the whole 368x448 panel — there is no HUD strip. The play field
 is 23x28 tiles at 16px, which fills the panel exactly. The handful of things
 that must stay visible float over the field instead of taking a band from it:
-level and hostage tally top-left, bombs remaining bottom-right, and the alert
-meter climbing the left and right edges.
+bombs remaining bottom-right, and the alert meter tracing the panel outline.
+
+The panel is a rounded rectangle, not the square its framebuffer implies:
+28.70mm of glass across 368px is 12.8px/mm, and the corner measures about 4mm,
+so `SCREEN_CORNER_R` is 52px. The alert trace follows that curve — a square
+path would disappear under the bezel at every corner.
 
 When the last hostage is freed and the exit unlocks, a ring far wider than the
 panel collapses onto the exit over 500ms — the one moment worth interrupting

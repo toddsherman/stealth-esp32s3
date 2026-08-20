@@ -244,36 +244,121 @@ void initials_render(gfx_surf_t *s, const game_t *g)
 
 // ---- Drawing --------------------------------------------------------------
 
-// The alert meter lives in peripheral vision: two columns climb the left and
-// right edges, and the moment they reach the top you have been identified.
-#define ALERT_COL_W 7
+// The alert meter traces the panel's own outline. It starts at bottom centre,
+// runs outward in both directions, rounds the lower corners, climbs both
+// sides, rounds the upper corners, and the two ends meet at top centre at the
+// instant you are identified. Following the real corner radius matters: a
+// square path would vanish under the bezel at every corner.
+#define ALERT_INSET  4
+#define ALERT_THICK  5
 
-static void draw_alert_columns(gfx_surf_t *s, const game_t *g)
+#define HALF_PI  1.57079633f
+#define PI_F     3.14159265f
+
+// A run of `frac` of the arc from a0 toward a1, as a chain of small squares.
+// The frame is rasterised in bands, so most of any arc is discarded by the
+// bounding-box test before a single pixel is touched.
+static void arc_run(gfx_surf_t *s, float ccx, float ccy, float r,
+                    float a0, float a1, float frac, int t,
+                    uint16_t col, uint32_t alpha)
+{
+    if (frac <= 0.0f) return;
+    if (frac > 1.0f) frac = 1.0f;
+
+    if ((int)(ccy + r) + t < s->oy || (int)(ccy - r) - t > s->oy + s->h) return;
+
+    const int steps = (int)(fabsf(a1 - a0) * r) + 1;
+    const int n     = (int)((float)steps * frac + 0.5f);
+    for (int i = 0; i <= n; i++) {
+        const float a = a0 + (a1 - a0) * ((float)i / (float)steps);
+        gfx_blend_rect(s, (int)(ccx + cosf(a) * r) - t / 2,
+                          (int)(ccy + sinf(a) * r) - t / 2, t, t, col, alpha);
+    }
+}
+
+static void trace_branch(gfx_surf_t *s, float len, bool right, int t,
+                         uint16_t col, uint32_t alpha)
+{
+    const float R  = (float)SCREEN_CORNER_R;
+    const float x0 = (float)ALERT_INSET;
+    const float x1 = (float)(PLAY_W - ALERT_INSET);
+    const float y0 = (float)ALERT_INSET;
+    const float y1 = (float)(PLAY_H - ALERT_INSET);
+    const float cx = PLAY_W * 0.5f;
+
+    const float L1 = cx - (x0 + R);          // bottom centre to corner
+    const float LA = HALF_PI * R;            // one corner
+    const float L3 = (y1 - y0) - 2.0f * R;   // one side
+    const float dir = right ? 1.0f : -1.0f;
+
+    float rem = len;
+
+    // 1) outward along the bottom
+    float run = (rem < L1) ? rem : L1;
+    if (run > 0.0f) {
+        const float xa = right ? cx : (cx - run);
+        gfx_blend_rect(s, (int)xa, (int)y1 - t / 2, (int)run + 1, t, col, alpha);
+    }
+    rem -= L1;
+    if (rem <= 0.0f) return;
+
+    // 2) lower corner
+    arc_run(s, right ? (x1 - R) : (x0 + R), y1 - R, R,
+            HALF_PI, right ? 0.0f : PI_F, rem / LA, t, col, alpha);
+    rem -= LA;
+    if (rem <= 0.0f) return;
+
+    // 3) up the side
+    run = (rem < L3) ? rem : L3;
+    gfx_blend_rect(s, (int)(right ? x1 : x0) - t / 2, (int)((y1 - R) - run),
+                   t, (int)run + 1, col, alpha);
+    rem -= L3;
+    if (rem <= 0.0f) return;
+
+    // 4) upper corner
+    arc_run(s, right ? (x1 - R) : (x0 + R), y0 + R, R,
+            right ? 0.0f : PI_F, right ? -HALF_PI : (PI_F + HALF_PI),
+            rem / LA, t, col, alpha);
+    rem -= LA;
+    if (rem <= 0.0f) return;
+
+    // 5) inward along the top, toward the meeting point
+    run = (rem < L1) ? rem : L1;
+    {
+        const float xa = right ? (x1 - R) : (x0 + R);
+        const float xl = (dir > 0.0f) ? (xa - run) : xa;
+        gfx_blend_rect(s, (int)xl, (int)y0 - t / 2, (int)run + 1, t, col, alpha);
+    }
+}
+
+static void draw_alert_trace(gfx_surf_t *s, const game_t *g)
 {
     if (g->phase != GS_PLAY && g->phase != GS_CAUGHT) return;
 
     const float a = g->max_alert;
     if (a <= 0.001f) return;
 
-    int h = (int)(a * (float)PLAY_H + 0.5f);
-    if (h < 2) h = 2;
-    const int y = PLAY_H - h;
+    const float R  = (float)SCREEN_CORNER_R;
+    const float L1 = PLAY_W * 0.5f - (ALERT_INSET + R);
+    const float LA = HALF_PI * R;
+    const float L3 = (float)(PLAY_H - 2 * ALERT_INSET) - 2.0f * R;
+    const float total = L1 + LA + L3 + LA + L1;
 
-    const bool critical = (a > 0.75f);
+    const float len = a * total;
+    const bool  critical = (a > 0.75f);
     const uint16_t col = critical ? COL_WHITE : COL_ALERT;
-    const uint32_t body = (uint32_t)(5.0f + a * 16.0f);
+    const uint32_t alpha = (uint32_t)(13.0f + a * 19.0f);
 
-    gfx_blend_rect(s, 0, y, ALERT_COL_W, h, col, body);
-    gfx_blend_rect(s, PLAY_W - ALERT_COL_W, y, ALERT_COL_W, h, col, body);
-    gfx_blend_rect(s, 0, y, ALERT_COL_W, 2, col, GFX_ALPHA_MAX);
-    gfx_blend_rect(s, PLAY_W - ALERT_COL_W, y, ALERT_COL_W, 2, col, GFX_ALPHA_MAX);
-
+    // A wider, fainter pass underneath reads as a glow once it is closing in.
     if (critical) {
         const float p = 0.5f + 0.5f * sinf(g->level_time * 16.0f);
-        const uint32_t flare = (uint32_t)(6.0f + p * 12.0f);
-        gfx_blend_rect(s, 0, y, ALERT_COL_W + 3, h, COL_ALERT, flare);
-        gfx_blend_rect(s, PLAY_W - ALERT_COL_W - 3, y, ALERT_COL_W + 3, h, COL_ALERT, flare);
+        const uint32_t flare = (uint32_t)(4.0f + p * 8.0f);
+        trace_branch(s, len, false, ALERT_THICK + 6, COL_ALERT, flare);
+        trace_branch(s, len, true,  ALERT_THICK + 6, COL_ALERT, flare);
     }
+
+    trace_branch(s, len, false, ALERT_THICK, col, alpha);
+    trace_branch(s, len, true,  ALERT_THICK, col, alpha);
 }
 
 static void draw_toast(gfx_surf_t *s)
@@ -326,7 +411,7 @@ void hud_render(gfx_surf_t *s, const game_t *g)
 {
     if (g->phase == GS_INITIALS) return;
 
-    draw_alert_columns(s, g);
+    draw_alert_trace(s, g);
     draw_reveal_label(s, g);
 
     if (g->phase != GS_TITLE && g->phase != GS_WIN) {
