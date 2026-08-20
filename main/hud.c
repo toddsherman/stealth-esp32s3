@@ -223,12 +223,10 @@ void hud_render(gfx_surf_t *s, const game_t *g)
     if (g->phase != GS_TITLE && g->phase != GS_WIN) {
         char buf[32];
 
-        // Top-left: level, then the hostage tally under it.
-        snprintf(buf, sizeof(buf), "%02d %s", g->level_idx + 1, g->lvl->name);
-        gfx_text(s, 12, 10, buf, COL_TEXT_DIM, 2);
-
+        // Top-left: just the hostage tally. The level name is on the
+        // briefing screen; repeating it here only crowded the field.
         for (int i = 0; i < g->hostage_count; i++) {
-            const int cx = 18 + i * 18, cy = 44;
+            const int cx = 18 + i * 18, cy = 22;
             if (i < g->rescued) gfx_fill_circle(s, cx, cy, 6, COL_HOSTAGE);
             else                gfx_ring(s, cx, cy, 6, 2, COL_HOSTAGE, 16);
         }

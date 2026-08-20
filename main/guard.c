@@ -20,60 +20,29 @@ static void turn_toward(guard_t *gd, float target, float rate, float dt)
     else                     gd->facing = wrap_angle(gd->facing + (diff > 0 ? step : -step));
 }
 
-// Flood from the destination, then step downhill. Recomputed per guard per
-// frame - the grid is only 575 tiles, so this is cheaper than keeping paths
-// coherent while targets move.
+// One step toward a destination, taken from the same routine that draws the
+// patrol overlay. Sharing it is the point: this used to be a second, subtly
+// different BFS that stopped as soon as the start tile was *assigned* rather
+// than dequeued, so it could pick a worse neighbour and walk a route that did
+// not match the line the overlay drew.
 static bool step_dir(const game_t *g, float fx, float fy, float tx, float ty,
                      float *out_dx, float *out_dy)
 {
-    static int16_t dist[GRID_H][GRID_W];
-    static uint16_t queue[GRID_W * GRID_H];
-
     const int sx = (int)(fx / TILE), sy = (int)(fy / TILE);
     const int gx = (int)(tx / TILE), gy = (int)(ty / TILE);
 
-    if (sx < 0 || sy < 0 || sx >= GRID_W || sy >= GRID_H) return false;
-    if (gx < 0 || gy < 0 || gx >= GRID_W || gy >= GRID_H) return false;
-    if (sx == gx && sy == gy) {
+    if (sx == gx && sy == gy) {          // same tile: steer straight at it
         *out_dx = tx - fx;
         *out_dy = ty - fy;
         return true;
     }
-    if (g_tile_solid(g, gx, gy)) return false;
 
-    memset(dist, -1, sizeof(dist));
-    int head = 0, tail = 0;
-    dist[gy][gx] = 0;
-    queue[tail++] = (uint16_t)(gy * GRID_W + gx);
+    // Two points is all a single step needs: where we are, and the next tile.
+    uint8_t px[2], py[2];
+    if (g_find_path(g, sx, sy, gx, gy, px, py, 2) < 2) return false;
 
-    static const int dxs[4] = {1, -1, 0, 0};
-    static const int dys[4] = {0, 0, 1, -1};
-
-    bool found = false;
-    while (head < tail && !found) {
-        const int cur = queue[head++];
-        const int cx = cur % GRID_W, cy = cur / GRID_W;
-        for (int i = 0; i < 4; i++) {
-            const int nx = cx + dxs[i], ny = cy + dys[i];
-            if (nx < 0 || ny < 0 || nx >= GRID_W || ny >= GRID_H) continue;
-            if (dist[ny][nx] >= 0 || g_tile_solid(g, nx, ny)) continue;
-            dist[ny][nx] = (int16_t)(dist[cy][cx] + 1);
-            queue[tail++] = (uint16_t)(ny * GRID_W + nx);
-            if (nx == sx && ny == sy) { found = true; break; }
-        }
-    }
-    if (dist[sy][sx] < 0) return false;
-
-    // Pick the neighbouring tile closest to the goal and aim at its centre.
-    int best = dist[sy][sx], bx = sx, by = sy;
-    for (int i = 0; i < 4; i++) {
-        const int nx = sx + dxs[i], ny = sy + dys[i];
-        if (nx < 0 || ny < 0 || nx >= GRID_W || ny >= GRID_H) continue;
-        if (dist[ny][nx] < 0) continue;
-        if (dist[ny][nx] < best) { best = dist[ny][nx]; bx = nx; by = ny; }
-    }
-    *out_dx = (bx * TILE + TILE * 0.5f) - fx;
-    *out_dy = (by * TILE + TILE * 0.5f) - fy;
+    *out_dx = (px[1] * TILE + TILE * 0.5f) - fx;
+    *out_dy = (py[1] * TILE + TILE * 0.5f) - fy;
     return true;
 }
 

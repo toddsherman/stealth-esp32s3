@@ -46,11 +46,12 @@ static void draw_exit(gfx_surf_t *s, const game_t *g)
         const float t = g->exit_anim;              // 1 -> 0
         const float r = 9.0f + (EXIT_REVEAL_R - 9.0f) * t;
         // Tightens and brightens as it converges.
-        const uint32_t a  = (uint32_t)(6.0f + (1.0f - t) * 22.0f);
-        const int thick   = 2 + (int)((1.0f - t) * 4.0f);
-        gfx_ring(s, cx, cy, (int)r, thick, COL_EXIT, a);
+        // A hairline, not a band: it brightens as it converges rather than
+        // thickening, so the collapse reads as speed instead of mass.
+        const uint32_t a = (uint32_t)(7.0f + (1.0f - t) * 23.0f);
+        gfx_ring(s, cx, cy, (int)r, 1, COL_EXIT, a);
         if (t < 0.55f) {
-            gfx_ring(s, cx, cy, (int)(r * 1.45f), 2, COL_EXIT,
+            gfx_ring(s, cx, cy, (int)(r * 1.45f), 1, COL_EXIT,
                      (uint32_t)(4.0f + (1.0f - t) * 6.0f));
         }
     }
@@ -131,7 +132,7 @@ static void build_routes(const game_t *g)
 // One continuous hairline along the whole route. Deliberately faint: a hint
 // you can read while held, not a second HUD.
 #define COL_ROUTE      RGB565(140, 175, 215)
-#define ROUTE_ALPHA    9      // of 32
+#define ROUTE_ALPHA    12     // of 32; sits over the cones now
 #define ROUTE_END_ALPHA 16
 
 static void draw_routes(gfx_surf_t *s, const game_t *g)
@@ -372,10 +373,15 @@ void game_render(gfx_surf_t *s, const game_t *g)
     if (world_visible) {
         draw_floor(s, g);
         draw_walls(s, g);
-        if (g->reveal_paths) draw_routes(s, g);
         draw_exit(s, g);
 
         for (int i = 0; i < g->guard_count; i++) draw_cone(s, &g->guards[i], i);
+
+        // Above the cones. A guard faces along its own patrol axis, so its
+        // cone lies directly over its route - drawing the line underneath
+        // left it tinted and broken up, reading as several overlapping paths
+        // rather than one.
+        if (g->reveal_paths) draw_routes(s, g);
 
         draw_hostages(s, g);
         draw_bomb(s, g);

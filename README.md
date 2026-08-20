@@ -210,6 +210,8 @@ tools/
   validate_levels.py   static checks on the maps
   host/preview.c       runs the real game code natively, writes frames
   host/synthwav.c      renders the real synth to a WAV
+  host/routecheck.c    regression checks on the patrol-route overlay
+  host/legend.c        renders docs/legend.png
   ppm2png.py           PPM -> PNG, no dependencies
 ```
 
@@ -225,6 +227,12 @@ python3 tools/validate_levels.py
 It checks row widths, sealed borders, exactly one spawn and exit, and — via
 flood fill — that every hostage, the exit, and every guard waypoint is
 actually reachable from the player's start.
+
+`tools/host/routecheck.c` covers the patrol-route overlay: that its polyline
+never blends a pixel twice (on one surface *and* through the 14-band path the
+device uses), and that the route drawn is the route walked — a guard is
+simulated along its patrol and every tile it occupies must lie on the drawn
+corridor. It exits non-zero on failure.
 
 The game core is plain C with no ESP dependencies, so it also runs natively.
 This renders real frames from the real code without a flash cycle:
