@@ -44,6 +44,11 @@ static bool  s_holding;
 static float s_hold_t;
 static float s_toast_t;
 
+// Last menu tap, shown in the menu footer. Serial is not reachable while the
+// board is in hand, so the diagnosis has to be legible on the panel itself.
+static int16_t s_dbg_x = -1, s_dbg_y = -1;
+static int8_t  s_dbg_row = -2;
+
 void hud_reset(void)
 {
     s_holding = false;
@@ -105,6 +110,7 @@ void hud_build_input(game_input_t *in, const touch_state_t *ts,
     if (g->menu_open) {
         if (ts->pressed) {
             const int row = menu_row_at(ts->x, ts->y);
+            s_dbg_x = ts->x; s_dbg_y = ts->y; s_dbg_row = (int8_t)row;
             in->menu_tapped = true;
             in->menu_tap_x  = ts->x;
             in->menu_tap_y  = ts->y;
@@ -421,8 +427,17 @@ static void draw_menu(gfx_surf_t *s, const game_t *g)
         gfx_text_centered(s, PLAY_W / 2, ry + 22, s_menu_labels[i], COL_PLAYER, 4);
     }
 
-    gfx_text_centered(s, PLAY_W / 2, MENU_Y + MENU_H - 24,
-                      "BUTTON TO CLOSE", COL_TEXT_DIM, 2);
+    if (s_dbg_row == -2) {
+        gfx_text_centered(s, PLAY_W / 2, MENU_Y + MENU_H - 24,
+                          "BUTTON TO CLOSE", COL_TEXT_DIM, 2);
+    } else {
+        char dbg[40];
+        static const char *RN[] = { "RESUME", "RELEVEL", "RESTART", "QUIT" };
+        snprintf(dbg, sizeof(dbg), "%d,%d %s", s_dbg_x, s_dbg_y,
+                 (s_dbg_row >= 0 && s_dbg_row < 4) ? RN[s_dbg_row] : "MISS");
+        gfx_text_centered(s, PLAY_W / 2, MENU_Y + MENU_H - 24, dbg,
+                          (s_dbg_row >= 0) ? COL_EXIT : COL_ALERT, 2);
+    }
 }
 
 void hud_render(gfx_surf_t *s, const game_t *g)
