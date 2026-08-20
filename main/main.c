@@ -24,6 +24,7 @@
 #include "board.h"
 #include "button.h"
 #include "game.h"
+#include "scores.h"
 #include "gfx.h"
 #include "imu.h"
 #include "touch.h"
@@ -95,6 +96,9 @@ void app_main(void)
     if (button_init() != ESP_OK) {
         ESP_LOGW(TAG, "continuing without the menu button");
     }
+    if (scores_init() != ESP_OK) {
+        ESP_LOGW(TAG, "continuing without saved records");
+    }
 
     s_flush_done = xSemaphoreCreateBinary();
     configASSERT(s_flush_done);
@@ -109,6 +113,10 @@ void app_main(void)
     static game_t game;
     game_init(&game);
     hud_reset();
+
+    // Start the initials screen on whoever played last.
+    scores_load_initials(game.initials);
+    ESP_LOGI(TAG, "%d stages, last player \"%s\"", level_count(), game.initials);
 
     touch_state_t touch = {0};
     game_input_t  input = {0};
@@ -135,6 +143,10 @@ void app_main(void)
         const bool menu_btn = button_pressed();
         hud_build_input(&input, &touch, tilt_x, tilt_y, menu_btn, &game, dt);
         if (input.recalibrate) imu_level();
+        if (input.initials_done) {
+            scores_save_initials(game.initials);
+            ESP_LOGI(TAG, "playing as \"%s\"", game.initials);
+        }
         if (input.menu_toggle) audio_sfx(SFX_ARM);   // menu open/close blip
         game_update(&game, dt, &input);
 
@@ -145,7 +157,27 @@ void app_main(void)
         if (game.events & EV_DETECT)     audio_sfx(SFX_DETECT);
         if (game.events & EV_SPOTTED)    audio_sfx(SFX_SPOTTED);
         if (game.events & EV_CAUGHT)     audio_sfx(SFX_CAUGHT);
-        if (game.events & EV_CLEAR)      audio_sfx(SFX_CLEAR);
+        if (game.events & EV_CLEAR) {
+            audio_sfx(SFX_CLEAR);
+
+            // Submit first, then read back: if this run set the record, the
+            // read returns the run that was just stored.
+            game.rec_is_new = scores_submit(game.level_idx, game.level_time,
+                                            game.initials);
+            uint16_t rc = 0;
+            char who[4] = {0};
+            if (scores_get(game.level_idx, &rc, who)) {
+                game.rec_centis = rc;
+                memcpy(game.rec_who, who, sizeof(game.rec_who));
+            } else {
+                game.rec_centis = 0;
+                game.rec_who[0] = '\0';
+            }
+            ESP_LOGI(TAG, "stage %d cleared in %.2fs; record %.2fs by %s%s",
+                     game.level_idx + 1, (double)game.level_time,
+                     (double)(game.rec_centis / 100.0f), game.rec_who,
+                     game.rec_is_new ? " (NEW)" : "");
+        }
 
         // The heartbeat tracks the closest guard's certainty, and only while
         // the level is actually being played.

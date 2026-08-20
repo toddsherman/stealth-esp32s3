@@ -76,6 +76,11 @@ void hud_build_input(game_input_t *in, const touch_state_t *ts,
 
     if (s_toast_t > 0.0f) s_toast_t -= dt;
 
+    if (g->phase == GS_INITIALS) {
+        initials_input(g, ts, in);
+        return;
+    }
+
     if (g->phase != GS_PLAY) {
         g->menu_open = false;
         s_holding = false;
@@ -135,6 +140,94 @@ void hud_build_input(game_input_t *in, const touch_state_t *ts,
     if (!ts->down) { s_holding = false; s_hold_t = 0.0f; }
 
     g->reveal_paths = s_holding && (s_hold_t >= HOLD_REVEAL_T);
+}
+
+// ---- Initials entry -------------------------------------------------------
+
+// 26 letters fill the first four rows and the start of the fifth; the two
+// cells left over on the last row become the confirm key.
+static char init_key_at(int col, int row)
+{
+    const int i = row * INIT_COLS + col;
+    if (i < 26) return (char)('A' + i);
+    return 0;
+}
+
+static bool init_in_start(int x, int y)
+{
+    const int gx = INIT_GRID_X + 2 * INIT_CELL_W;
+    const int gy = INIT_GRID_Y + 4 * INIT_CELL_H;
+    return in_rect(x, y, gx, gy, 4 * INIT_CELL_W, INIT_CELL_H);
+}
+
+void initials_input(game_t *g, const touch_state_t *ts, game_input_t *in)
+{
+    if (!ts->pressed) return;
+
+    if (init_in_start(ts->x, ts->y)) {
+        in->initials_done = true;
+        return;
+    }
+
+    // The two letter slots are tappable, so a mistyped first letter can be
+    // corrected without cycling all the way round.
+    for (int i = 0; i < 2; i++) {
+        const int bx = PLAY_W / 2 - 78 + i * 82;
+        if (in_rect(ts->x, ts->y, bx, 104, 74, 84)) {
+            g->initials_cursor = (uint8_t)i;
+            return;
+        }
+    }
+
+    const int col = (ts->x - INIT_GRID_X) / INIT_CELL_W;
+    const int row = (ts->y - INIT_GRID_Y) / INIT_CELL_H;
+    if (col < 0 || col >= INIT_COLS || row < 0 || row >= INIT_ROWS) return;
+    if (ts->x < INIT_GRID_X || ts->y < INIT_GRID_Y) return;
+
+    const char c = init_key_at(col, row);
+    if (!c) return;
+
+    g->initials[g->initials_cursor] = c;
+    g->initials_cursor = (uint8_t)((g->initials_cursor + 1) % 2);
+}
+
+void initials_render(gfx_surf_t *s, const game_t *g)
+{
+    gfx_fill_rect(s, 0, 0, PLAY_W, PLAY_H, COL_BG);
+    gfx_text_centered(s, PLAY_W / 2, 34, "WHO IS PLAYING", COL_TEXT, 3);
+    gfx_text_centered(s, PLAY_W / 2, 68, "TWO INITIALS FOR THE SCOREBOARD",
+                      COL_TEXT_DIM, 1);
+
+    for (int i = 0; i < 2; i++) {
+        const int bx = PLAY_W / 2 - 78 + i * 82;
+        const bool active = (g->initials_cursor == i);
+        gfx_blend_rect(s, bx, 104, 74, 84, COL_PLAYER, active ? 7 : 3);
+        gfx_rect_frame(s, bx, 104, 74, 84, active ? 2 : 1,
+                       active ? COL_PLAYER : COL_PLAYER_D);
+        const char t[2] = { g->initials[i], 0 };
+        gfx_text_centered(s, bx + 37, 126, t, COL_PLAYER, 6);
+    }
+
+    for (int row = 0; row < INIT_ROWS; row++) {
+        for (int col = 0; col < INIT_COLS; col++) {
+            const char c = init_key_at(col, row);
+            if (!c) continue;
+            const int x = INIT_GRID_X + col * INIT_CELL_W;
+            const int y = INIT_GRID_Y + row * INIT_CELL_H;
+            gfx_blend_rect(s, x + 2, y + 2, INIT_CELL_W - 4, INIT_CELL_H - 4,
+                           COL_TEXT_DIM, 4);
+            const char t[2] = { c, 0 };
+            gfx_text_centered(s, x + INIT_CELL_W / 2, y + 13, t, COL_TEXT, 3);
+        }
+    }
+
+    const int sx = INIT_GRID_X + 2 * INIT_CELL_W;
+    const int sy = INIT_GRID_Y + 4 * INIT_CELL_H;
+    gfx_blend_rect(s, sx + 2, sy + 2, 4 * INIT_CELL_W - 4, INIT_CELL_H - 4,
+                   COL_EXIT, 6);
+    gfx_rect_frame(s, sx + 2, sy + 2, 4 * INIT_CELL_W - 4, INIT_CELL_H - 4, 1,
+                   COL_EXIT);
+    gfx_text_centered(s, sx + 2 * INIT_CELL_W, sy + 13, "START", COL_EXIT, 3);
 }
 
 // ---- Drawing --------------------------------------------------------------
@@ -217,6 +310,8 @@ static void draw_menu(gfx_surf_t *s, const game_t *g)
 
 void hud_render(gfx_surf_t *s, const game_t *g)
 {
+    if (g->phase == GS_INITIALS) return;
+
     draw_alert_columns(s, g);
     draw_reveal_label(s, g);
 

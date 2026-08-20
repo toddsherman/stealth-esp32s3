@@ -26,7 +26,7 @@ int main(void){
 
     // --- 1) does the polyline ever blend the same pixel twice? ---
     printf("=== double-blend check ===\n");
-    for (int L = 0; L < g_level_count; L++) {
+    for (int L = 0; L < level_count(); L++) {
         game_init(&g); game_load_level(&g, L); g.phase = GS_PLAY;
         for (int i = 0; i < g.guard_count; i++) {
             const guard_def_t *d = g.guards[i].def;
@@ -60,7 +60,7 @@ int main(void){
 
     // --- 2) does the drawn route match the path guards actually walk? ---
     printf("\n=== drawn route vs walked route ===\n");
-    for (int L = 0; L < g_level_count; L++) {
+    for (int L = 0; L < level_count(); L++) {
         game_init(&g); game_load_level(&g, L); g.phase = GS_PLAY;
         for (int i = 0; i < g.guard_count; i++) {
             const guard_def_t *d = g.guards[i].def;
@@ -103,7 +103,7 @@ int main(void){
         static uint16_t band[W*32];
         static int counts[W*H];
         int worst = 0;
-        for (int L = 0; L < g_level_count; L++) {
+        for (int L = 0; L < level_count(); L++) {
             game_init(&g); game_load_level(&g, L); g.phase = GS_PLAY;
             for (int i = 0; i < g.guard_count; i++) {
                 const guard_def_t *d = g.guards[i].def;

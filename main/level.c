@@ -259,3 +259,20 @@ const level_def_t g_levels[] = {
 };
 
 const int g_level_count = (int)(sizeof(g_levels) / sizeof(g_levels[0]));
+
+// The hand-built stages teach the mechanics; the generated ones carry the
+// difficulty ramp from there.
+int level_count(void)
+{
+    return g_level_count + g_level_gen_count;
+}
+
+const level_def_t *level_get(int idx)
+{
+    if (idx < 0) idx = 0;
+    if (idx < g_level_count) return &g_levels[idx];
+
+    idx -= g_level_count;
+    if (idx >= g_level_gen_count) idx = g_level_gen_count - 1;
+    return &g_levels_gen[idx];
+}

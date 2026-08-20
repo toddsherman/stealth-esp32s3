@@ -288,6 +288,10 @@ static void draw_overlay(gfx_surf_t *s, const game_t *g)
     char buf[48];
 
     switch (g->phase) {
+    case GS_INITIALS:
+        initials_render(s, g);
+        break;
+
     case GS_TITLE: {
         gfx_fill_rect(s, 0, 0, PLAY_W, PLAY_H, COL_BG);
         gfx_text_centered(s, PLAY_W / 2, 104, "STEALTH", COL_PLAYER, 6);
@@ -299,15 +303,18 @@ static void draw_overlay(gfx_surf_t *s, const game_t *g)
         gfx_text_centered(s, PLAY_W / 2, 290, "HOLD TO SEE PATROLS", COL_TEXT, 2);
         gfx_text_centered(s, PLAY_W / 2, 316, "BUTTON FOR MENU", COL_TEXT_DIM, 2);
 
+        snprintf(buf, sizeof(buf), "PLAYING AS %s", g->initials);
+        gfx_text_centered(s, PLAY_W / 2, 344, buf, COL_HOSTAGE, 2);
+
         if (fmodf(g->phase_t, 1.2f) < 0.7f) {
-            gfx_text_centered(s, PLAY_W / 2, 372, "TAP TO BEGIN", COL_PLAYER, 3);
+            gfx_text_centered(s, PLAY_W / 2, 386, "TAP TO BEGIN", COL_PLAYER, 3);
         }
         break;
     }
 
     case GS_BRIEF: {
         dim(s, 24);
-        snprintf(buf, sizeof(buf), "%d / %d", g->level_idx + 1, g_level_count);
+        snprintf(buf, sizeof(buf), "%d / %d", g->level_idx + 1, level_count());
         gfx_text_centered(s, PLAY_W / 2, 150, buf, COL_TEXT_DIM, 3);
         gfx_text_centered(s, PLAY_W / 2, 192, g->lvl->name, COL_PLAYER,
                           gfx_text_fit_scale(g->lvl->name, PLAY_W - 16, 5));
@@ -338,13 +345,28 @@ static void draw_overlay(gfx_surf_t *s, const game_t *g)
 
     case GS_CLEAR: {
         dim(s, 20);
-        gfx_text_centered(s, PLAY_W / 2, 152, "CLEAR", COL_EXIT, 6);
+        gfx_text_centered(s, PLAY_W / 2, 128, "CLEAR", COL_EXIT, 6);
+
         snprintf(buf, sizeof(buf), "%d:%04.1f", (int)(g->level_time / 60.0f),
                  fmodf(g->level_time, 60.0f));
-        gfx_text_centered(s, PLAY_W / 2, 216, buf, COL_TEXT, 3);
+        gfx_text_centered(s, PLAY_W / 2, 190, buf, COL_TEXT, 4);
+
+        // The standing record for this stage, and who holds it.
+        if (g->rec_is_new) {
+            gfx_text_centered(s, PLAY_W / 2, 248, "NEW RECORD", COL_HOSTAGE, 3);
+            snprintf(buf, sizeof(buf), "%s", g->initials);
+            gfx_text_centered(s, PLAY_W / 2, 282, buf, COL_HOSTAGE, 3);
+        } else if (g->rec_centis > 0) {
+            gfx_text_centered(s, PLAY_W / 2, 248, "RECORD", COL_TEXT_DIM, 2);
+            snprintf(buf, sizeof(buf), "%d:%04.1f  %s",
+                     g->rec_centis / 6000, fmodf(g->rec_centis / 100.0f, 60.0f),
+                     g->rec_who);
+            gfx_text_centered(s, PLAY_W / 2, 274, buf, COL_HOSTAGE, 3);
+        }
+
         if (g->phase_t > 0.8f && fmodf(g->phase_t, 1.2f) < 0.7f) {
-            gfx_text_centered(s, PLAY_W / 2, 290,
-                              (g->level_idx + 1 >= g_level_count) ? "TAP TO FINISH"
+            gfx_text_centered(s, PLAY_W / 2, 340,
+                              (g->level_idx + 1 >= level_count()) ? "TAP TO FINISH"
                                                                   : "TAP TO CONTINUE",
                               COL_PLAYER, 3);
         }

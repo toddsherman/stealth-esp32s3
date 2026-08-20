@@ -95,6 +95,22 @@ int main(int argc, char **argv)
     game_init(&g);
     hud_reset();
 
+    // --- initials entry (the first screen now) ---
+    sim(&g, 0.3f, NULL);
+    render_to_fb(&g);
+    snprintf(path, sizeof(path), "%s/00_initials.ppm", outdir);
+    write_ppm(path);
+
+    // Tap N, then S, then START.
+    tap(&g, INIT_GRID_X + 1 * INIT_CELL_W + 29, INIT_GRID_Y + 2 * INIT_CELL_H + 23); // N
+    tap(&g, INIT_GRID_X + 0 * INIT_CELL_W + 29, INIT_GRID_Y + 3 * INIT_CELL_H + 23); // S
+    render_to_fb(&g);
+    snprintf(path, sizeof(path), "%s/00b_initials.ppm", outdir);
+    write_ppm(path);
+    printf("initials entered: %s\n", g.initials);
+    tap(&g, PLAY_W / 2, INIT_GRID_Y + 4 * INIT_CELL_H + 23);   // START
+    printf("phase after START: %d (1 = GS_TITLE)\n", (int)g.phase);
+
     // --- title ---
     sim(&g, 0.5f, NULL);
     render_to_fb(&g);
@@ -282,6 +298,27 @@ int main(int argc, char **argv)
                hot_frame, event_frame,
                (hot_frame >= 0 && hot_frame == event_frame) ? "IN SYNC" : "DRIFTED");
     }
+
+    // --- clear screen with a standing record ---
+    reset_inputs();
+    game_load_level(&g, 0);
+    g.phase = GS_CLEAR;
+    g.phase_t = 1.0f;
+    g.level_time = 23.4f;
+    g.rec_centis = 1985;          // 19.85s
+    strcpy(g.rec_who, "JT");
+    g.rec_is_new = false;
+    render_to_fb(&g);
+    snprintf(path, sizeof(path), "%s/14_record.ppm", outdir);
+    write_ppm(path);
+
+    g.rec_is_new = true;
+    g.level_time = 17.2f;
+    render_to_fb(&g);
+    snprintf(path, sizeof(path), "%s/15_newrecord.ppm", outdir);
+    write_ppm(path);
+
+    printf("levels available: %d\n", level_count());
 
     // --- report simulated state, so the harness doubles as a smoke test ---
     printf("levels=%d  final: phase=%d level=%d guards=%d hostages=%d bombs=%d\n",

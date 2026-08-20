@@ -104,8 +104,15 @@ typedef struct {
     uint8_t      bombs;
 } level_def_t;
 
+// Six hand-built stages, then 100 generated ones (tools/gen_levels.py).
+// Always go through level_get() / level_count() rather than either array.
 extern const level_def_t g_levels[];
 extern const int         g_level_count;
+extern const level_def_t g_levels_gen[];
+extern const int         g_level_gen_count;
+
+const level_def_t *level_get(int idx);
+int                level_count(void);
 
 // ---- Runtime state --------------------------------------------------------
 // One-shot events raised by the simulation and drained by the platform layer.
@@ -121,7 +128,7 @@ enum {
     EV_DETECT      = 1u << 6,   // a guard's cone just went hot: you are noticed
 };
 
-typedef enum { GS_TITLE, GS_BRIEF, GS_PLAY, GS_CAUGHT, GS_CLEAR, GS_WIN } phase_t;
+typedef enum { GS_INITIALS, GS_TITLE, GS_BRIEF, GS_PLAY, GS_CAUGHT, GS_CLEAR, GS_WIN } phase_t;
 typedef enum { GM_PATROL, GM_INVESTIGATE, GM_LOOK, GM_CHASE } guard_mode_t;
 
 typedef struct {
@@ -166,6 +173,7 @@ typedef struct {
     bool  recalibrate;   // player asked for the current attitude to be neutral
     bool  menu_toggle;   // the physical button was pressed
     bool  restart;       // restart the current level
+    bool  initials_done; // the player confirmed their initials
 } game_input_t;
 
 typedef struct {
@@ -194,6 +202,14 @@ typedef struct {
     bool  reveal_paths;   // finger held down: show the guards' patrol routes
     bool  menu_open;      // pause menu is up; the simulation is frozen
     float exit_anim;      // 1 -> 0 while the exit-unlocked ring collapses
+
+    // Who is playing, and the standing record for the stage just cleared.
+    // The record is filled in by the platform layer, which owns storage.
+    char     initials[3];
+    uint8_t  initials_cursor;
+    uint16_t rec_centis;      // 0 = no record yet
+    char     rec_who[4];
+    bool     rec_is_new;      // this run set it
 } game_t;
 
 // ---- API ------------------------------------------------------------------
@@ -223,6 +239,17 @@ int  g_find_path(const game_t *g, int sx, int sy, int gx, int gy,
 
 // HUD / input
 void hud_reset(void);
+
+// Initials entry: an A-Z grid the player taps. The layout lives here so the
+// drawn keys and the hit test cannot disagree about where a key is.
+#define INIT_COLS    6
+#define INIT_ROWS    5
+#define INIT_CELL_W  58
+#define INIT_CELL_H  46
+#define INIT_GRID_X  ((PLAY_W - INIT_COLS * INIT_CELL_W) / 2)
+#define INIT_GRID_Y  212
+void initials_render(gfx_surf_t *s, const game_t *g);
+void initials_input(game_t *g, const touch_state_t *ts, game_input_t *in);
 // tilt_x / tilt_y come from the IMU, already in screen space and clamped to
 // the unit disc. Passing them in (rather than reading the IMU here) keeps this
 // file free of ESP dependencies so the native preview harness can drive it.

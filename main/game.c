@@ -202,9 +202,9 @@ static void particles_update(game_t *g, float dt)
 void game_load_level(game_t *g, int idx)
 {
     if (idx < 0) idx = 0;
-    if (idx >= g_level_count) idx = g_level_count - 1;
+    if (idx >= level_count()) idx = level_count() - 1;
 
-    const level_def_t *L = &g_levels[idx];
+    const level_def_t *L = level_get(idx);
     g->level_idx = idx;
     g->lvl       = L;
 
@@ -276,10 +276,12 @@ void game_load_level(game_t *g, int idx)
 void game_init(game_t *g)
 {
     memset(g, 0, sizeof(*g));
-    g->phase   = GS_TITLE;
-    g->phase_t = 0.0f;
     game_load_level(g, 0);
-    g->phase   = GS_TITLE;
+    g->initials[0] = 'A';
+    g->initials[1] = 'A';
+    g->initials[2] = '\0';
+    g->initials_cursor = 0;
+    g->phase   = GS_INITIALS;
     g->phase_t = 0.0f;
 }
 
@@ -426,6 +428,13 @@ void game_update(game_t *g, float dt, const game_input_t *in)
     g->phase_t += dt;
 
     switch (g->phase) {
+    case GS_INITIALS:
+        if (in->initials_done) {
+            g->phase   = GS_TITLE;
+            g->phase_t = 0.0f;
+        }
+        return;
+
     case GS_TITLE:
         if (in->tap && g->phase_t > 0.4f) {
             game_load_level(g, 0);
@@ -450,7 +459,7 @@ void game_update(game_t *g, float dt, const game_input_t *in)
     case GS_CLEAR:
         particles_update(g, dt);
         if (g->phase_t > 0.8f && in->tap) {
-            if (g->level_idx + 1 >= g_level_count) {
+            if (g->level_idx + 1 >= level_count()) {
                 g->phase   = GS_WIN;
                 g->phase_t = 0.0f;
             } else {

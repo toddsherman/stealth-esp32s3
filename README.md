@@ -73,6 +73,22 @@ Or manually:
 source ~/esp/esp-idf/export.sh && idf.py -B /tmp/stealth-build -p /dev/cu.usbmodem1101 flash monitor
 ```
 
+## Stages and records
+
+106 stages: six hand-built ones that teach the mechanics, then 100 generated
+by [`tools/gen_levels.py`](tools/gen_levels.py) with difficulty ramping along
+four axes — wall density, guard count, hostage count, and how far the exit
+sits from the spawn. Guards go 1→6, hostages 1→4.
+
+Every generated stage is validated before it is emitted: sealed border, fully
+connected floor, reachable exit, hostages and waypoints — and crucially, no
+guard's patrol may pass within vision range of the spawn. The generator is
+deterministic, so regenerating produces the same 100 stages.
+
+You enter two initials before playing. Each stage keeps its best time and
+whoever set it in NVS, so records survive a power cycle; clearing a stage
+shows the standing record, or NEW RECORD if you just took it.
+
 ## Screen key
 
 Every on-screen element, rendered from the game's own palette and rasteriser:
@@ -211,6 +227,7 @@ tools/
   host/preview.c       runs the real game code natively, writes frames
   host/synthwav.c      renders the real synth to a WAV
   host/routecheck.c    regression checks on the patrol-route overlay
+  host/smoke.c         loads and simulates all 106 stages
   host/legend.c        renders docs/legend.png
   ppm2png.py           PPM -> PNG, no dependencies
 ```
@@ -227,6 +244,11 @@ python3 tools/validate_levels.py
 It checks row widths, sealed borders, exactly one spawn and exit, and — via
 flood fill — that every hostage, the exit, and every guard waypoint is
 actually reachable from the player's start.
+
+`tools/host/smoke.c` loads and simulates every stage, and asserts that no
+guard can see the player at the moment a stage begins. That check caught a
+generated stage which spotted and captured the player within 1.5 seconds of
+starting, before they had moved.
 
 `tools/host/routecheck.c` covers the patrol-route overlay: that its polyline
 never blends a pixel twice (on one surface *and* through the 14-band path the
