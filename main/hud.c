@@ -20,9 +20,11 @@
 #define TOAST_W       268
 #define TOAST_H       104
 
-#define BOMB_PIP_X    (PLAY_W - 38)
-#define BOMB_PIP_Y    (PLAY_H - 36)
-#define BOMB_PIP_R    23
+// Bombs read as dots along the top edge, clear of the alert trace that runs
+// just outside them and of the rounded corners.
+#define BOMB_DOT_Y    20
+#define BOMB_DOT_R    5
+#define BOMB_DOT_GAP  17
 
 #define MENU_W        328
 #define MENU_H        382
@@ -427,16 +429,17 @@ void hud_render(gfx_surf_t *s, const game_t *g)
     draw_reveal_label(s, g);
 
     if (g->phase != GS_TITLE && g->phase != GS_WIN) {
-        char buf[32];
-
-        // Bottom-right: bombs remaining. A readout, not a control - throwing
-        // is a tap on the field now.
-        const bool usable = (g->bombs_left > 0);
-        const uint16_t bc = usable ? COL_SOUND : COL_TEXT_DIM;
-        gfx_blend_circle(s, BOMB_PIP_X, BOMB_PIP_Y, BOMB_PIP_R, RGB565(4, 6, 10), 20);
-        gfx_ring(s, BOMB_PIP_X, BOMB_PIP_Y, BOMB_PIP_R, 2, bc, usable ? 26 : 12);
-        snprintf(buf, sizeof(buf), "%d", g->bombs_left);
-        gfx_text_centered(s, BOMB_PIP_X, BOMB_PIP_Y - 10, buf, bc, 3);
+        // Bombs remaining, centred on the top edge.
+        const int n = g->bombs_left;
+        if (n > 0) {
+            const int span = (n - 1) * BOMB_DOT_GAP;
+            const int x0   = PLAY_W / 2 - span / 2;
+            for (int i = 0; i < n; i++) {
+                const int cx = x0 + i * BOMB_DOT_GAP;
+                gfx_blend_circle(s, cx, BOMB_DOT_Y, BOMB_DOT_R + 3, COL_SOUND, 5);
+                gfx_fill_circle(s, cx, BOMB_DOT_Y, BOMB_DOT_R, COL_SOUND);
+            }
+        }
     }
 
     draw_toast(s);

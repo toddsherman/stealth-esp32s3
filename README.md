@@ -113,7 +113,8 @@ Every on-screen element, rendered from the game's own palette and rasteriser:
 The game uses the whole 368x448 panel — there is no HUD strip. The play field
 is 23x28 tiles at 16px, which fills the panel exactly. The handful of things
 that must stay visible float over the field instead of taking a band from it:
-bombs remaining bottom-right, and the alert meter tracing the panel outline.
+bombs remaining as dots on the top edge, and the alert meter tracing the
+panel outline.
 
 The panel is a rounded rectangle, not the square its framebuffer implies:
 28.70mm of glass across 368px is 12.8px/mm, and the corner measures about 4mm,

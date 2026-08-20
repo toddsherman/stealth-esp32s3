@@ -184,16 +184,11 @@ void game_render_prepare(const game_t *g)
 }
 
 // Filled as one polygon so adjacent triangles never double-blend into seams.
-static void draw_cone(gfx_surf_t *s, const guard_t *gd, int idx)
+// No outline: the wedge alone carries the shape, and hard edges made the cone
+// read as a solid object rather than as light falling on the floor.
+static void draw_cone(gfx_surf_t *s, int idx)
 {
     gfx_blend_poly(s, s_cone[idx].pts, s_cone[idx].n, s_cone[idx].col, s_cone[idx].alpha);
-
-    // Bright leading edges make the exact reach of the cone readable. The
-    // first and last fan points are already those endpoints.
-    const gfx_pt_t *p = s_cone[idx].pts;
-    const int last = s_cone[idx].n - 1;
-    gfx_line(s, (int)gd->x, (int)gd->y, (int)p[1].x, (int)p[1].y, s_cone[idx].col);
-    gfx_line(s, (int)gd->x, (int)gd->y, (int)p[last].x, (int)p[last].y, s_cone[idx].col);
 }
 
 static void draw_guard_body(gfx_surf_t *s, const game_t *g, const guard_t *gd)
@@ -402,7 +397,7 @@ void game_render(gfx_surf_t *s, const game_t *g)
         draw_walls(s, g);
         draw_exit(s, g);
 
-        for (int i = 0; i < g->guard_count; i++) draw_cone(s, &g->guards[i], i);
+        for (int i = 0; i < g->guard_count; i++) draw_cone(s, i);
 
         // Above the cones. A guard faces along its own patrol axis, so its
         // cone lies directly over its route - drawing the line underneath

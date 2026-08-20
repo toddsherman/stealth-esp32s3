@@ -57,10 +57,6 @@ static void cone_icon(int cx, int cy, uint16_t col, uint32_t a)
         n++;
     }
     gfx_blend_poly(&S, p, n, col, a);
-    gfx_line(&S, cx, cy, (int)(cx + cosf(start) * 26.0f),
-                         (int)(cy + sinf(start) * 26.0f), col);
-    gfx_line(&S, cx, cy, (int)(cx + cosf(start + fov) * 26.0f),
-                         (int)(cy + sinf(start + fov) * 26.0f), col);
 }
 
 int main(int argc, char **argv)
@@ -168,25 +164,20 @@ int main(int argc, char **argv)
 
     // --- persistent overlays ---
     y = row_y(i) + 14;
-    gfx_blend_rect(&S, ICON_X - 16, y - 10, 7, 20, COL_ALERT, 14);
-    gfx_blend_rect(&S, ICON_X - 16, y - 10, 7, 2, COL_ALERT, GFX_ALPHA_MAX);
-    gfx_blend_rect(&S, ICON_X + 9, y - 10, 7, 20, COL_ALERT, 14);
-    gfx_blend_rect(&S, ICON_X + 9, y - 10, 7, 2, COL_ALERT, GFX_ALPHA_MAX);
-    label(i++, "ALERT COLUMNS", COL_ALERT);
+    // The alert meter as it appears: a trace following the panel outline.
+    gfx_blend_rect(&S, ICON_X - 16, y + 9, 32, 4, COL_ALERT, 22);
+    gfx_blend_rect(&S, ICON_X - 18, y - 6, 4, 15, COL_ALERT, 22);
+    gfx_blend_rect(&S, ICON_X + 14, y - 6, 4, 15, COL_ALERT, 22);
+    label(i++, "ALERT TRACE", COL_ALERT);
 
     y = row_y(i) + 14;
-    gfx_ring(&S, ICON_X, y, 13, 1, COL_TEXT_DIM, 14);
-    gfx_fill_rect(&S, ICON_X - 2, y, 5, 1, COL_TEXT_DIM);
-    gfx_fill_rect(&S, ICON_X, y - 2, 1, 5, COL_TEXT_DIM);
-    gfx_fill_circle(&S, ICON_X + 5, y - 3, 4, COL_PLAYER);
-    label(i++, "TILT BUBBLE", COL_PLAYER);
-
     y = row_y(i) + 14;
-    gfx_blend_circle(&S, ICON_X, y, 14, RGB565(4, 6, 10), 22);
-    gfx_blend_circle(&S, ICON_X, y, 14, COL_SOUND, 8);
-    gfx_ring(&S, ICON_X, y, 14, 2, COL_SOUND, GFX_ALPHA_MAX);
-    gfx_text(&S, ICON_X - 3, y - 6, "2", COL_SOUND, 2);
-    label(i++, "BOMB BUTTON", COL_SOUND);
+    for (int k = 0; k < 3; k++) {
+        const int cx = ICON_X - 17 + k * 17;
+        gfx_blend_circle(&S, cx, y, 8, COL_SOUND, 5);
+        gfx_fill_circle(&S, cx, y, 5, COL_SOUND);
+    }
+    label(i++, "BOMBS LEFT", COL_SOUND);
 
     y = row_y(i) + 14;
     for (int k = 0; k < 6; k++) {
