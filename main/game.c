@@ -422,6 +422,13 @@ void game_update(game_t *g, float dt, const game_input_t *in)
         return;
     }
 
+    if (in->quit) {
+        game_load_level(g, g->level_idx);   // reset the stage behind the menu
+        g->phase   = GS_TITLE;
+        g->phase_t = 0.0f;
+        return;
+    }
+
     // With the menu up the world is frozen: no guards, no timers, no alert.
     if (g->menu_open) return;
 

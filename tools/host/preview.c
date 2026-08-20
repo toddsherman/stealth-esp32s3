@@ -257,9 +257,9 @@ int main(int argc, char **argv)
         hud_build_input(&in, &ts, 0.0f, 0.0f, true, &g, dt);   // button opens
         game_update(&g, dt, &in);
 
-        // Tap the RE-LEVEL row: menu is centred, second row of three.
-        const int menu_y = (448 - 268) / 2;
-        const int row1_y = menu_y + 66 + 60 + 20;
+        // Tap the RE-LEVEL row: menu is centred, second of four.
+        const int menu_y = (448 - 382) / 2;
+        const int row1_y = menu_y + 56 + 74 + 30;
         ts.down = true; ts.pressed = true; ts.x = 184; ts.y = (int16_t)row1_y;
         hud_build_input(&in, &ts, 0.0f, 0.0f, false, &g, dt);
         game_update(&g, dt, &in);

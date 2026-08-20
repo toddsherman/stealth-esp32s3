@@ -24,16 +24,17 @@
 #define BOMB_PIP_Y    (PLAY_H - 36)
 #define BOMB_PIP_R    23
 
-#define MENU_W        292
-#define MENU_H        268
+#define MENU_W        328
+#define MENU_H        382
 #define MENU_X        ((PLAY_W - MENU_W) / 2)
 #define MENU_Y        ((PLAY_H - MENU_H) / 2)
-#define MENU_ROW_H    60
-#define MENU_ROW0_Y   (MENU_Y + 66)
-#define MENU_ITEMS    3
+#define MENU_ROW_H    74
+#define MENU_ROW0_Y   (MENU_Y + 56)
+#define MENU_ROW_INSET 4      // visual only - the hit target is the full pitch
+#define MENU_ITEMS    4
 
 static const char *s_menu_labels[MENU_ITEMS] = {
-    "RESUME", "RE-LEVEL", "RESTART",
+    "RESUME", "RE-LEVEL", "RESTART", "QUIT",
 };
 
 static bool  s_holding;
@@ -71,7 +72,10 @@ void hud_build_input(game_input_t *in, const touch_state_t *ts,
     in->throw_now   = false;
     in->recalibrate = false;
     in->restart     = false;
+    in->quit        = false;
     in->menu_toggle = menu_button;
+    in->menu_tapped = false;
+    in->menu_row    = -1;
     in->tap = ts->pressed;
 
     if (s_toast_t > 0.0f) s_toast_t -= dt;
@@ -96,7 +100,12 @@ void hud_build_input(game_input_t *in, const touch_state_t *ts,
 
     if (g->menu_open) {
         if (ts->pressed) {
-            switch (menu_row_at(ts->x, ts->y)) {
+            const int row = menu_row_at(ts->x, ts->y);
+            in->menu_tapped = true;
+            in->menu_tap_x  = ts->x;
+            in->menu_tap_y  = ts->y;
+            in->menu_row    = (int8_t)row;
+            switch (row) {
             case 0:
                 g->menu_open = false;
                 break;
@@ -107,6 +116,10 @@ void hud_build_input(game_input_t *in, const touch_state_t *ts,
                 break;
             case 2:
                 in->restart = true;
+                g->menu_open = false;
+                break;
+            case 3:
+                in->quit = true;
                 g->menu_open = false;
                 break;
             default:
@@ -297,11 +310,11 @@ static void draw_menu(gfx_surf_t *s, const game_t *g)
 
     for (int i = 0; i < MENU_ITEMS; i++) {
         const int ry = MENU_ROW0_Y + i * MENU_ROW_H;
-        gfx_blend_rect(s, MENU_X + 14, ry, MENU_W - 28, MENU_ROW_H - 10,
-                       COL_PLAYER, 4);
-        gfx_rect_frame(s, MENU_X + 14, ry, MENU_W - 28, MENU_ROW_H - 10, 1,
-                       COL_PLAYER_D);
-        gfx_text_centered(s, PLAY_W / 2, ry + 11, s_menu_labels[i], COL_PLAYER, 4);
+        gfx_blend_rect(s, MENU_X + 8, ry + MENU_ROW_INSET, MENU_W - 16,
+                       MENU_ROW_H - MENU_ROW_INSET * 2, COL_PLAYER, 5);
+        gfx_rect_frame(s, MENU_X + 8, ry + MENU_ROW_INSET, MENU_W - 16,
+                       MENU_ROW_H - MENU_ROW_INSET * 2, 1, COL_PLAYER_D);
+        gfx_text_centered(s, PLAY_W / 2, ry + 22, s_menu_labels[i], COL_PLAYER, 4);
     }
 
     gfx_text_centered(s, PLAY_W / 2, MENU_Y + MENU_H - 24,

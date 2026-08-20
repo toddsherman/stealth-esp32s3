@@ -25,7 +25,7 @@ extern "C" {
 #define PLAY_W      (GRID_W * TILE)   // 368
 #define PLAY_H      (GRID_H * TILE)   // 448
 
-#define MAX_GUARDS      6
+#define MAX_GUARDS      8
 #define MAX_HOSTAGES    4
 #define MAX_WAYPOINTS   6
 #define MAX_PARTICLES   48
@@ -173,7 +173,13 @@ typedef struct {
     bool  recalibrate;   // player asked for the current attitude to be neutral
     bool  menu_toggle;   // the physical button was pressed
     bool  restart;       // restart the current level
+    bool  quit;          // abandon the stage and go back to the title
     bool  initials_done; // the player confirmed their initials
+
+    // Diagnostics for menu taps, logged by the platform layer.
+    bool    menu_tapped;
+    int16_t menu_tap_x, menu_tap_y;
+    int8_t  menu_row;    // -1 = tap landed on no row
 } game_input_t;
 
 typedef struct {

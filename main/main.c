@@ -147,7 +147,17 @@ void app_main(void)
             scores_save_initials(game.initials);
             ESP_LOGI(TAG, "playing as \"%s\"", game.initials);
         }
-        if (input.menu_toggle) audio_sfx(SFX_ARM);   // menu open/close blip
+        if (input.menu_toggle) {
+            audio_sfx(SFX_ARM);   // menu open/close blip
+            ESP_LOGI(TAG, "menu button -> %s", game.menu_open ? "OPEN" : "CLOSED");
+        }
+        if (input.menu_tapped) {
+            static const char *rows[] = { "RESUME", "RE-LEVEL", "RESTART", "QUIT" };
+            ESP_LOGI(TAG, "menu tap at (%d,%d) -> %s",
+                     input.menu_tap_x, input.menu_tap_y,
+                     (input.menu_row >= 0 && input.menu_row < 4)
+                         ? rows[input.menu_row] : "MISS");
+        }
         game_update(&game, dt, &input);
 
         // Drain the simulation's one-shot events into sound.
