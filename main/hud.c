@@ -56,15 +56,18 @@ static bool in_rect(int x, int y, int rx, int ry, int rw, int rh)
     return x >= rx && x < rx + rw && y >= ry && y < ry + rh;
 }
 
+// The target is the full row pitch and the full panel width, which is wider
+// than the box that is drawn. Testing the drawn box instead left an 8px dead
+// strip between every row, a 12px dead margin down both sides, and - because
+// the box is drawn 4px lower than it was tested - a dead sliver along the
+// bottom of each row, which is exactly where a thumb lands on the last item.
 static int menu_row_at(int x, int y)
 {
-    for (int i = 0; i < MENU_ITEMS; i++) {
-        if (in_rect(x, y, MENU_X + 12, MENU_ROW0_Y + i * MENU_ROW_H,
-                    MENU_W - 24, MENU_ROW_H - 8)) {
-            return i;
-        }
-    }
-    return -1;
+    if (x < MENU_X || x >= MENU_X + MENU_W) return -1;
+    const int dy = y - MENU_ROW0_Y;
+    if (dy < 0) return -1;
+    const int row = dy / MENU_ROW_H;
+    return (row < MENU_ITEMS) ? row : -1;
 }
 
 void hud_build_input(game_input_t *in, const touch_state_t *ts,

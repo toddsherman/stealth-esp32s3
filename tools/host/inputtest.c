@@ -87,6 +87,46 @@ int main(void)
     threw = tap_throws(150, 200);
     check("a tap during play does throw", threw);
 
+    // ---- menu targets ----------------------------------------------------
+    // Every pixel of a drawn row must resolve to that row. A hit test that
+    // does not match the box being drawn leaves dead slivers exactly where a
+    // thumb lands.
+    const int MENU_W = 328, MENU_H = 382, ROW_H = 74, ITEMS = 4, INSET = 4;
+    const int MX = (PLAY_W - MENU_W) / 2, MY = (PLAY_H - MENU_H) / 2;
+    const int ROW0 = MY + 56;
+
+    int mismatch = 0;
+    for (int r = 0; r < ITEMS; r++) {
+        const int bx = MX + 8,  bw = MENU_W - 16;
+        const int by = ROW0 + r * ROW_H + INSET, bh = ROW_H - INSET * 2;
+        for (int y = by; y < by + bh; y += 2) {
+            for (int x = bx; x < bx + bw; x += 16) {
+                game_init(&g); hud_reset(); memset(&ts, 0, sizeof(ts));
+                g.phase = GS_PLAY; g.lvl = level_get(0);
+                frame(false, 0, 0, true);            // open the menu
+                const game_input_t in = frame(true, x, y, false);
+                if (in.menu_row != r) mismatch++;
+                frame(false, 0, 0, false);
+            }
+        }
+    }
+    check("every pixel of every drawn row hits that row", mismatch == 0);
+    if (mismatch) printf("      %d sampled points resolved to the wrong row\n", mismatch);
+
+    // ---- QUIT from every phase -------------------------------------------
+    static const char *PN[] = {"INITIALS","TITLE","BRIEF","PLAY","CAUGHT","CLEAR","WIN"};
+    for (int p = GS_TITLE; p <= GS_WIN; p++) {
+        game_init(&g); hud_reset(); memset(&ts, 0, sizeof(ts));
+        g.phase = (phase_t)p; g.phase_t = 2.0f; g.lvl = level_get(0);
+        frame(false, 0, 0, true);                    // open the menu
+        const bool opened = g.menu_open;
+        frame(true, PLAY_W / 2, ROW0 + 3 * ROW_H + 40, false);   // QUIT
+        frame(false, 0, 0, false);
+        char msg[80];
+        snprintf(msg, sizeof(msg), "QUIT from %s reaches initials", PN[p]);
+        check(msg, opened && g.phase == GS_INITIALS);
+    }
+
     printf("\n%s\n", fails ? "FAILURES" : "all input checks passed");
     return fails ? 1 : 0;
 }
