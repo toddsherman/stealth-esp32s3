@@ -41,7 +41,7 @@ vision range of the spawn.
 
 Deterministic: a fixed seed reproduces the same 100 stages.
 """
-import random, collections, math, sys
+import random, collections, math, sys, heapq, itertools
 
 W, H = 23, 28
 MAX_GUARDS, MAX_HOSTAGES = 8, 4
@@ -53,6 +53,12 @@ SEED = 20260821
 VISION_TILES = 110.0 / 16.0      # GUARD_RANGE / TILE
 HALF_FOV     = 1.20 / 2.0        # GUARD_FOV / 2
 SPAWN_SAFE   = 8.0
+
+# Every stage must force the player through watched ground. This is the worst
+# coverage the *safest possible* route has to accept - if it were zero, the
+# stage could be finished without ever entering a cone at all. A brief crossing
+# still has to be timed, so even the opening stages teach the core loop.
+MIN_CROSSING = 0.16
 CYCLE_STEPS  = 4                 # dwell samples at each waypoint
 
 NB4 = ((1, 0), (-1, 0), (0, 1), (0, -1))
@@ -306,6 +312,63 @@ def temporal_coverage(g, paths, cache):
     return combined
 
 
+def bottleneck_from(g, cov, src):
+    """For every tile, the least-exposed route from src: the minimum over all
+    paths of the *worst* coverage encountered along it.
+
+    This is the number that matters for "must you cross a guard". Averaging
+    coverage over one chosen route says nothing, because the player picks the
+    route - and will pick the one that keeps its worst moment lowest. A
+    max-metric Dijkstra answers exactly that.
+    """
+    best = {src: cov.get(src, 0.0)}
+    pq = [(best[src], src)]
+    while pq:
+        c, t = heapq.heappop(pq)
+        if c > best.get(t, 2.0):
+            continue
+        for dx, dy in NB4:
+            n = (t[0] + dx, t[1] + dy)
+            if not (0 <= n[0] < W and 0 <= n[1] < H) or g[n[1]][n[0]] == "#":
+                continue
+            nc = max(c, cov.get(n, 0.0))
+            if nc < best.get(n, 2.0):
+                best[n] = nc
+                heapq.heappush(pq, (nc, n))
+    return best
+
+
+def safest_crossing(g, cov, start, hostages, exit_t):
+    """The worst coverage the player must accept, assuming perfect play.
+
+    Every ordering of the hostages is tried and the best one taken, because
+    the player is free to choose. If this is zero there is a way through the
+    stage that never enters a cone at all.
+    """
+    nodes = [start] + list(hostages) + [exit_t]
+    table = {n: bottleneck_from(g, cov, n) for n in nodes}
+
+    best = 2.0
+    for order in itertools.permutations(range(len(hostages))):
+        legs, cur = 0.0, start
+        ok = True
+        for idx in order:
+            nxt = hostages[idx]
+            v = table[cur].get(nxt)
+            if v is None:
+                ok = False; break
+            legs = max(legs, v)
+            cur = nxt
+        if not ok:
+            continue
+        v = table[cur].get(exit_t)
+        if v is None:
+            continue
+        legs = max(legs, v)
+        best = min(best, legs)
+    return None if best > 1.5 else best
+
+
 def build(rng, d):
     g = blank()
     carve(rng, g, int(6 + d * 26))
@@ -325,7 +388,7 @@ def build(rng, d):
         return None
 
     n_host = min(MAX_HOSTAGES, 1 + int(d ** 1.1 * 3.4))
-    n_guard = min(MAX_GUARDS, 1 + int(d ** 0.7 * 7.2))
+    n_guard = min(MAX_GUARDS, 2 + int(d ** 0.7 * 6.2))
 
     cands = [t for t in fl if dd.get(t, 0) >= 6 and t not in (start, exit_t)]
     rng.shuffle(cands)
@@ -367,6 +430,13 @@ def build(rng, d):
 
     exposure = sum(cov.get(t, 0.0) for t in rt) / len(rt)
 
+    # Hard requirement: there must be no way to collect every hostage and
+    # reach the exit without crossing ground a guard watches. A stage that can
+    # be completed without ever entering a cone is not a stealth stage.
+    crossing = safest_crossing(g, cov, start, hostages, exit_t)
+    if crossing is None or crossing < MIN_CROSSING:
+        return None
+
     # Unavoidable tiles: articulation points on the route whose removal
     # actually severs the spawn from the exit.
     aps = articulation_points(g, fl)
@@ -399,12 +469,13 @@ def build(rng, d):
     bombs = max(1, 3 - int(d * 1.7))
     relief = min(1.0, bombs / max(1, len(guards)))
 
-    score = (0.30 * min(1.0, exposure * 1.6) +
-             0.24 * choke +
+    score = (0.26 * min(1.0, crossing * 2.0) +
+             0.16 * min(1.0, exposure * 1.6) +
+             0.20 * choke +
              0.14 * (1.0 - safe_frac) +
              0.12 * min(1.0, cover_dist / 6.0) +
-             0.12 * (len(guards) / MAX_GUARDS) +
-             0.08 * min(1.0, len(rt) / 90.0) -
+             0.10 * (len(guards) / MAX_GUARDS) +
+             0.06 * min(1.0, len(rt) / 90.0) -
              0.10 * relief)
 
     g[start[1]][start[0]] = "@"
@@ -416,6 +487,7 @@ def build(rng, d):
         "rows": ["".join(r) for r in g], "guards": guards, "bombs": bombs,
         "start": start, "exit": exit_t, "hostages": hostages,
         "score": score, "exposure": exposure, "choke": choke,
+        "crossing": crossing,
         "safe": safe_frac, "cover": cover_dist, "tour": len(rt),
         "chokes": len(chokes), "dwell": round(1.40 - d * 0.95, 2),
     }
@@ -442,6 +514,8 @@ def validate(lv):
         assert grid[a[1]][a[0]] != "#" and grid[b[1]][b[0]] != "#", "waypoint in wall"
         assert b in reachable(grid, a), "waypoints not mutually reachable"
         assert patrol_is_fair(grid, lv["start"], a, b), "patrol passes the spawn"
+    # The stage must not be completable without entering a cone.
+    assert lv["crossing"] >= MIN_CROSSING, "a route avoids every guard"
 
 
 def main():
@@ -506,14 +580,18 @@ def main():
     open('main/level_gen.c', 'w').write('\n'.join(out))
 
     print("\npool %d (%d attempts) -> %d stages" % (len(pool), attempts, len(levels)))
-    print(" stage  score  expo  choke  safe  cover  guards  host  bombs  tour")
+    print(" stage  score  cross  expo  choke  safe  guards  host  bombs  tour")
     for k in (0, 11, 24, 37, 49, 62, 74, 87, 99):
         l = levels[k]
-        print("  %3d   %.3f  %.2f   %.2f  %.2f   %.1f      %d      %d      %d    %d" %
-              (k + 1, l["score"], l["exposure"], l["choke"], l["safe"],
-               l["cover"], len(l["guards"]), len(l["hostages"]), l["bombs"], l["tour"]))
+        print("  %3d   %.3f   %.2f  %.2f   %.2f  %.2f      %d      %d      %d    %d" %
+              (k + 1, l["score"], l["crossing"], l["exposure"], l["choke"],
+               l["safe"], len(l["guards"]), len(l["hostages"]), l["bombs"],
+               l["tour"]))
     mono = all(levels[i]["score"] <= levels[i + 1]["score"] for i in range(WANT - 1))
+    worst = min(l["crossing"] for l in levels)
     print("monotonic:", mono)
+    print("every stage forces a guard crossing: %s (weakest %.2f, floor %.2f)"
+          % (worst >= MIN_CROSSING, worst, MIN_CROSSING))
 
 
 if __name__ == "__main__":

@@ -109,8 +109,29 @@ scored. What is scored is how hard the level is to actually move through:
 - **Relief.** Bombs *per guard*, not bombs absolute — three against seven is
   scarcity.
 
-Measured across the 100: exposure 0.00 → 0.42, worst choke 0.00 → 0.83, guards
-1 → 7, hostages 1 → 4, tour length 24 → 133 tiles. Candidates are sorted by
+### The one hard rule
+
+**No stage can be completed without crossing ground a guard watches.** This is
+a constraint, not a scoring term — a candidate that fails it is discarded.
+
+Checking it properly means accounting for the fact that the player chooses the
+route, and will choose whichever one keeps its worst moment lowest. So the
+generator solves a bottleneck path: a max-metric Dijkstra giving, for every
+pair of objectives, the minimum over all routes of the *worst* coverage along
+it. Every ordering of the hostages is then tried and the best taken. If that
+number is zero, a way through exists that never enters a cone, and the stage is
+rejected.
+
+Averaging coverage over one chosen route would not catch this: a stage can have
+healthy average exposure on the direct path and still have a completely safe
+detour beside it.
+
+The floor is 0.16 — even stage 1 forces you across ground watched at least 16%
+of a patrol cycle, and no stage has fewer than two guards. Measured across the
+100, that bottleneck rises 0.16 → 0.92.
+
+Measured across the 100: forced crossing 0.16 → 0.92, worst choke 0.00 → 0.92,
+guards 2 → 7, hostages 1 → 4. Candidates are sorted by
 score and sampled evenly, so the ramp is monotonic by construction.
 
 Fairness overrides difficulty: sealed border, fully connected floor, reachable
