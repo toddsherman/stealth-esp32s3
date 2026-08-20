@@ -128,6 +128,18 @@ void hud_build_input(game_input_t *in, const touch_state_t *ts,
         return;             // frozen: no movement, no throwing
     }
 
+    // Everything below is gameplay input. Without this gate a press that
+    // lands on a menu prompt - "TAP TO START", "TAP TO RETRY" - starts a hold
+    // on that screen, the tap advances to play while the finger is still
+    // down, and the release then completes as a throw at the coordinates of
+    // the prompt that was pressed.
+    if (g->phase != GS_PLAY) {
+        s_holding = false;
+        s_hold_t  = 0.0f;
+        g->reveal_paths = false;
+        return;
+    }
+
     in->mx = tilt_x;
     in->my = tilt_y;
 
