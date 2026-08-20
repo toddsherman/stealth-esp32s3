@@ -5,13 +5,29 @@
 
 // ---- World ----------------------------------------------------------------
 
+// Rows of the tile grid that intersect this band. The frame is rasterised in
+// 14 bands; walking all 28 tile rows in each of them and letting the clipper
+// throw most away was 14x more iteration than the work needed.
+static inline void band_rows(const gfx_surf_t *s, int *ty0, int *ty1)
+{
+    int a = s->oy / TILE;
+    int b = (s->oy + s->h + TILE - 1) / TILE;
+    if (a < 0) a = 0;
+    if (b > GRID_H) b = GRID_H;
+    *ty0 = a;
+    *ty1 = b;
+}
+
 static void draw_floor(gfx_surf_t *s, const game_t *g)
 {
     gfx_fill_rect(s, 0, 0, PLAY_W, PLAY_H, COL_FLOOR);
 
+    int ty0, ty1;
+    band_rows(s, &ty0, &ty1);
+
     // Faint lattice: gives the abstract space a sense of scale without
     // competing with anything that matters.
-    for (int ty = 0; ty < GRID_H; ty++) {
+    for (int ty = ty0; ty < ty1; ty++) {
         for (int tx = 0; tx < GRID_W; tx++) {
             if (g->tiles[ty][tx] == T_WALL) continue;
             gfx_fill_rect(s, tx * TILE, ty * TILE, 1, 1, COL_GRID);
@@ -21,7 +37,10 @@ static void draw_floor(gfx_surf_t *s, const game_t *g)
 
 static void draw_walls(gfx_surf_t *s, const game_t *g)
 {
-    for (int ty = 0; ty < GRID_H; ty++) {
+    int ty0, ty1;
+    band_rows(s, &ty0, &ty1);
+
+    for (int ty = ty0; ty < ty1; ty++) {
         for (int tx = 0; tx < GRID_W; tx++) {
             if (g->tiles[ty][tx] != T_WALL) continue;
             const int x = tx * TILE, y = ty * TILE;
@@ -388,9 +407,12 @@ static void draw_overlay(gfx_surf_t *s, const game_t *g)
 
 void game_render(gfx_surf_t *s, const game_t *g)
 {
-    gfx_clear(s, COL_BG);
-
-    const bool world_visible = (g->phase != GS_TITLE && g->phase != GS_WIN);
+    // No clear: every path below paints the full surface before anything
+    // else - draw_floor when the world is up, and the title, win and
+    // initials overlays otherwise. Clearing first meant filling the whole
+    // frame twice.
+    const bool world_visible = (g->phase != GS_TITLE && g->phase != GS_WIN &&
+                                g->phase != GS_INITIALS);
 
     if (world_visible) {
         draw_floor(s, g);

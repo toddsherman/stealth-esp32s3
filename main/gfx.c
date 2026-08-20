@@ -33,9 +33,17 @@ void gfx_fill_rect(gfx_surf_t *s, int x, int y, int w, int h, uint16_t c)
     if (w <= 0 || h <= 0) return;
 
     const uint16_t d = gfx_to_dev(c);
+    const uint32_t pair = ((uint32_t)d << 16) | d;
+
+    // Two pixels per store. Solid fills are the single largest cost in a
+    // frame - the floor alone is a full-screen rect every band.
     for (int r = 0; r < h; r++) {
         uint16_t *p = s->px + (size_t)(y + r) * s->stride + x;
-        for (int i = 0; i < w; i++) p[i] = d;
+        int n = w;
+        if (((uintptr_t)p & 2u) && n) { *p++ = d; n--; }   // reach alignment
+        uint32_t *q = (uint32_t *)p;
+        for (int i = n >> 1; i > 0; i--) *q++ = pair;
+        if (n & 1) *(uint16_t *)q = d;
     }
 }
 

@@ -213,16 +213,31 @@ hostages), measured on device:
 
 | | |
 |---|---|
-| Framerate | **34–38 FPS** (26–29ms/frame, with audio running) |
-| Cone raycasting | 1.3 ms |
-| Rasterising (14 bands) | 15.5 ms |
-| QSPI DMA | 9.5 ms |
+| Framerate | **50 FPS** (19ms/frame, with audio running) |
+| Cone raycasting | 1.5 ms |
+| Rasterising (4 bands) | 6.7 ms |
+| QSPI DMA wait | 9.5 ms |
 | Binary | 294 KB (81% of the partition free) |
 | Internal heap free | 258 KB |
 
-QSPI runs at the vendor-validated 40MHz. That is a 16.5ms floor for a full
-frame, so the renderer and the bus are roughly balanced — raising the clock is
-the first place to look for more headroom.
+Measured on the heaviest stage with the alert meter active. Three changes took
+it from 34.5 to 50 FPS:
+
+- **Band height 32 → 112 rows** (14 bands → 4). Every band costs a synchronous
+  window-set round trip before its pixels can stream, and that protocol
+  overhead turned out to cost more than the rasterising did. This was worth
+  more than every CPU optimisation combined.
+- **No redundant clear.** `gfx_clear` painted the whole surface and
+  `draw_floor` immediately painted over all of it — the frame was being filled
+  twice. Every render path already covers the full surface, which
+  `tools/host` verifies by poisoning the buffer and counting unpainted pixels.
+- **Tile loops clipped to the band**, plus 32-bit-wide solid fills. Rasterising
+  went 14.5ms → 6.7ms.
+
+QSPI still runs at the vendor-validated 40MHz, a 16.5ms floor for a full frame.
+Raising it is the one remaining lever — `CO5300_PANEL_IO_QSPI_CONFIG` in
+[`main/board.c`](main/board.c) — but signal integrity can only be judged by
+looking at the panel, so it is left at the safe default.
 
 ## Layout
 

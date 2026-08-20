@@ -51,7 +51,7 @@ extern "C" {
 #define GUARD_TURN_RATE   4.5f        // rad/s
 #define GUARD_FOV         1.20f       // radians, total cone angle (~69 deg)
 #define GUARD_RANGE       110.0f      // px
-#define CONE_RAYS         40
+#define CONE_RAYS         32
 
 #define ALERT_DRAIN       0.75f       // per second when nothing is visible
 // The moment a guard resolves you from "something moved" into "someone is

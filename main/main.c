@@ -10,6 +10,11 @@
 //
 // Two band buffers ping-pong: one is being filled while the other is in
 // flight, so drawing and transfer overlap without ever sharing a bus.
+//
+// Band height is a tradeoff: every band costs a synchronous window-set round
+// trip to the panel before its pixels can stream, so fewer, larger bands mean
+// less protocol overhead and longer uninterrupted DMA runs. 64 rows is 47KB
+// per buffer, 94KB for the pair, which internal RAM has room for.
 #include <stdio.h>
 #include <string.h>
 
@@ -31,9 +36,8 @@
 
 static const char *TAG = "stealth";
 
-#define SHOW_FPS    1
-#define BAND_H      32
-#define BAND_COUNT  (LCD_V_RES / BAND_H)          // 448 / 32 = 14
+#define BAND_H      112
+#define BAND_COUNT  (LCD_V_RES / BAND_H)          // 448 / 112 = 4
 #define BAND_PIXELS (LCD_H_RES * BAND_H)
 #define BAND_BYTES  (BAND_PIXELS * sizeof(uint16_t))
 
@@ -67,16 +71,6 @@ static esp_err_t alloc_bands(void)
              (unsigned)BAND_BYTES, BAND_COUNT, BAND_H);
     return ESP_OK;
 }
-
-#if SHOW_FPS
-static void draw_fps(gfx_surf_t *s, float fps, uint32_t frame_us)
-{
-    char buf[24];
-    snprintf(buf, sizeof(buf), "%2d FPS %2lums", (int)(fps + 0.5f),
-             (unsigned long)(frame_us / 1000));
-    gfx_text(s, LCD_H_RES - 74, 4, buf, RGB565(60, 70, 88), 1);
-}
-#endif
 
 void app_main(void)
 {
@@ -213,9 +207,6 @@ void app_main(void)
             // Every draw call clips to the surface, so rendering the whole
             // scene per band costs only the geometry that actually lands here.
             game_render(&surf, &game);
-#if SHOW_FPS
-            draw_fps(&surf, fps, frame_us);
-#endif
 
             // Wait for the previous band to finish before reusing its buffer.
             xSemaphoreTake(s_flush_done, portMAX_DELAY);

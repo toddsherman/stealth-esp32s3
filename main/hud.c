@@ -20,11 +20,12 @@
 #define TOAST_W       268
 #define TOAST_H       104
 
-// Bombs read as dots along the top edge, clear of the alert trace that runs
-// just outside them and of the rounded corners.
-#define BOMB_DOT_Y    20
-#define BOMB_DOT_R    5
-#define BOMB_DOT_GAP  17
+// Bombs read as dots set into the top wall itself. That band is tile row 0,
+// y 0..15; the alert trace occupies y 2..6 just above them, so the dots sit
+// low in the band and the two never touch.
+#define BOMB_DOT_Y    11
+#define BOMB_DOT_R    3
+#define BOMB_DOT_GAP  12
 
 #define MENU_W        328
 #define MENU_H        382
@@ -436,7 +437,6 @@ void hud_render(gfx_surf_t *s, const game_t *g)
             const int x0   = PLAY_W / 2 - span / 2;
             for (int i = 0; i < n; i++) {
                 const int cx = x0 + i * BOMB_DOT_GAP;
-                gfx_blend_circle(s, cx, BOMB_DOT_Y, BOMB_DOT_R + 3, COL_SOUND, 5);
                 gfx_fill_circle(s, cx, BOMB_DOT_Y, BOMB_DOT_R, COL_SOUND);
             }
         }
