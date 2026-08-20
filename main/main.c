@@ -92,7 +92,18 @@ void app_main(void)
     if (button_init() != ESP_OK) {
         ESP_LOGW(TAG, "continuing without the menu button");
     }
-    if (scores_init() != ESP_OK) {
+    // Fingerprint the stage table so records cannot outlive the maps they
+    // were set on. Cheap FNV-1a over every row of every stage.
+    uint32_t set_id = 2166136261u;
+    for (int i = 0; i < level_count(); i++) {
+        const level_def_t *L = level_get(i);
+        for (int r = 0; r < GRID_H; r++) {
+            for (const char *c = L->rows[r]; c && *c; c++) {
+                set_id = (set_id ^ (uint32_t)(unsigned char)*c) * 16777619u;
+            }
+        }
+    }
+    if (scores_init(set_id) != ESP_OK) {
         ESP_LOGW(TAG, "continuing without saved records");
     }
 

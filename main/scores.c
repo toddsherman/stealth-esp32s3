@@ -11,6 +11,7 @@ static const char *TAG = "scores";
 #define NVS_NAMESPACE "stealth"
 #define KEY_RECORDS   "recs"
 #define KEY_INITIALS  "who"
+#define KEY_SET_ID    "setid"
 
 typedef struct {
     uint16_t centis;      // 0 = unset
@@ -29,7 +30,7 @@ static void persist(void)
     nvs_close(h);
 }
 
-esp_err_t scores_init(void)
+esp_err_t scores_init(uint32_t set_id)
 {
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -42,13 +43,31 @@ esp_err_t scores_init(void)
     memset(s_recs, 0, sizeof(s_recs));
 
     nvs_handle_t h;
+    bool wipe = false;
     if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &h) == ESP_OK) {
-        size_t len = sizeof(s_recs);
-        // A short read means the table grew since it was written; whatever
-        // fits is kept and the rest stays empty.
-        if (nvs_get_blob(h, KEY_RECORDS, s_recs, &len) != ESP_OK) {
-            ESP_LOGI(TAG, "no saved records yet");
+        uint32_t stored = 0;
+        if (nvs_get_u32(h, KEY_SET_ID, &stored) != ESP_OK || stored != set_id) {
+            // Different stage table. Keeping the times would show a record for
+            // a map that no longer exists at that index.
+            ESP_LOGW(TAG, "stage set changed (%08lx -> %08lx), clearing records",
+                     (unsigned long)stored, (unsigned long)set_id);
+            wipe = true;
+        } else {
+            size_t len = sizeof(s_recs);
+            if (nvs_get_blob(h, KEY_RECORDS, s_recs, &len) != ESP_OK) {
+                ESP_LOGI(TAG, "no saved records yet");
+            }
         }
+        nvs_close(h);
+    }
+
+    if (wipe) {
+        memset(s_recs, 0, sizeof(s_recs));
+    }
+    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_u32(h, KEY_SET_ID, set_id);
+        if (wipe) nvs_set_blob(h, KEY_RECORDS, s_recs, sizeof(s_recs));
+        nvs_commit(h);
         nvs_close(h);
     }
 

@@ -1,49 +1,75 @@
 #!/usr/bin/env python3
-"""Generates main/level_gen.c - 94 procedural stages of rising difficulty.
+"""Generates main/level_gen.c - 100 stages ordered by measured difficulty.
 
-Difficulty is *measured*, not assumed. Each candidate is scored by how exposed
-the route you are forced to walk actually is:
+Difficulty is modelled, not guessed. The obvious knobs - guard count, hostage
+count, wall density - turn out to be weak predictors on their own, so they are
+inputs to generation but not to the score. What is scored is how hard the level
+actually is to move through:
 
-  - the required tour (spawn -> every hostage -> exit) is pathfound,
-  - every guard's patrol is walked and the tiles it can see are accumulated,
-  - the score is dominated by what fraction of that tour sits under guard
-    vision, and by how many guards watch each of those tiles.
+  TEMPORAL COVERAGE
+    Each guard is walked around its full patrol cycle, including the dwell at
+    each end where it stands and scans. At every step its real vision cone is
+    computed - the game's FOV and range, clipped by line of sight - and the
+    result accumulated per tile. A tile's coverage is the fraction of the cycle
+    it is visible for. This is the key correction over a naive model: a tile
+    glimpsed once is not the same as a tile watched constantly, but a static
+    union of cone positions scores them identically.
 
-Secondary terms cover guard count, tour length, corridor tightness and how many
-sound bombs you are given. Candidates are then sorted by score and sampled
-evenly across the range, which makes the ramp monotonic by construction rather
-than by hoping the parameters behave.
+  UNAVOIDABLE CHOKEPOINTS
+    Tiles the player cannot route around - articulation points whose removal
+    disconnects the spawn from the exit - that also lie on the required tour.
+    A watched choke has to be timed rather than avoided, which is the single
+    hardest thing this game asks of you. Scored by the coverage of the worst
+    one.
 
-Fairness rules that override difficulty:
-  - the map is sealed and fully connected,
-  - the exit, every hostage and every waypoint is reachable,
-  - no guard's patrol passes within vision range of the spawn.
+  COVER
+    How much of the map is never watched, and how far the route runs from the
+    nearest unwatched tile. A chasing guard matches the player's speed, so
+    breaking line of sight is the only escape; a route with no cover beside it
+    is a route with no recovery from a mistake.
 
-Deterministic: a fixed seed reproduces the same stages.
+  RELIEF
+    Sound bombs per guard, which is what lets you displace a patrol. Absolute
+    bomb count means little - three bombs against seven guards is scarcity.
+
+Candidates are generated across a wide parameter sweep, scored, sorted, and
+sampled evenly across the range, so the ramp is monotonic by construction.
+
+Fairness rules override difficulty: sealed border, fully connected floor,
+reachable exit, hostages and waypoints, and no guard patrol may pass within
+vision range of the spawn.
+
+Deterministic: a fixed seed reproduces the same 100 stages.
 """
 import random, collections, math, sys
 
 W, H = 23, 28
 MAX_GUARDS, MAX_HOSTAGES = 8, 4
-WANT = 94              # 6 hand-built stages precede these, for 100 total
-POOL = 150             # candidates generated, then sampled down to WANT
-SEED = 20260820
+WANT = 100
+POOL = 260
+SEED = 20260821
 
-VISION_TILES = 7       # GUARD_RANGE 110px / 16px per tile, rounded up
-SPAWN_SAFE   = 8.0     # no patrol may come this close to the spawn
+# Mirrors of the game's own constants (game.h).
+VISION_TILES = 110.0 / 16.0      # GUARD_RANGE / TILE
+HALF_FOV     = 1.20 / 2.0        # GUARD_FOV / 2
+SPAWN_SAFE   = 8.0
+CYCLE_STEPS  = 4                 # dwell samples at each waypoint
+
+NB4 = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 ADJ = ["COLD","QUIET","LOW","LONG","DARK","THIN","BLIND","SILENT","SHORT","DEEP",
        "GLASS","IRON","PAPER","SALT","AMBER","SLATE","HOLLOW","NARROW","BITTER",
        "PALE","STILL","SHARP","BLACK","GREY","LAST","FIRST","OPEN","CLOSED",
-       "BROKEN","EMPTY","WIDE","HIGH","OLD","NEW","RED","BLUE","SLOW","FAST"]
+       "BROKEN","EMPTY","WIDE","HIGH","OLD","NEW","RED","BLUE","SLOW","FAST",
+       "LOST","QUIET","SPARE","BLANK","CLEAN","ROUGH","PLAIN","STEEP"]
 NOUN = ["WATCH","YARD","HALL","LINE","GATE","VAULT","ROOM","WING","STAIR","DOCK",
         "MARKET","CHAPEL","OFFICE","GARDEN","TUNNEL","LOBBY","ANNEX","DEPOT",
         "STUDY","KITCHEN","CELLAR","ATRIUM","LANDING","GALLERY","COURT","PANTRY",
-        "FOYER","ARCHIVE","BRIDGE","TOWER","CRYPT","MILL","FORGE","QUARRY"]
+        "FOYER","ARCHIVE","BRIDGE","TOWER","CRYPT","MILL","FORGE","QUARRY",
+        "LEDGE","SHAFT","CANAL","TERRACE","ALCOVE","ROTUNDA"]
 
-NB4 = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
-
+# ---------------------------------------------------------------- geometry --
 def blank():
     g = [["#"] * W for _ in range(H)]
     for y in range(1, H - 1):
@@ -56,15 +82,16 @@ def floors(g):
     return [(x, y) for y in range(H) for x in range(W) if g[y][x] != "#"]
 
 
-def reachable(g, start):
+def reachable(g, start, blocked=None):
     seen = {start}
     q = collections.deque([start])
     while q:
         x, y = q.popleft()
         for dx, dy in NB4:
             n = (x + dx, y + dy)
-            if (0 <= n[0] < W and 0 <= n[1] < H and n not in seen
-                    and g[n[1]][n[0]] != "#"):
+            if n == blocked or n in seen:
+                continue
+            if 0 <= n[0] < W and 0 <= n[1] < H and g[n[1]][n[0]] != "#":
                 seen.add(n); q.append(n)
     return seen
 
@@ -76,15 +103,14 @@ def dists(g, start):
         x, y = q.popleft()
         for dx, dy in NB4:
             n = (x + dx, y + dy)
-            if (0 <= n[0] < W and 0 <= n[1] < H and n not in d
-                    and g[n[1]][n[0]] != "#"):
+            if n not in d and 0 <= n[0] < W and 0 <= n[1] < H and g[n[1]][n[0]] != "#":
                 d[n] = d[(x, y)] + 1
                 q.append(n)
     return d
 
 
 def path_between(g, a, b):
-    """The route the game's own guards will walk: downhill through a BFS."""
+    """The route the game's guards actually walk: downhill through a BFS."""
     d = dists(g, b)
     if a not in d:
         return None
@@ -105,16 +131,13 @@ def path_between(g, a, b):
 
 
 def los(g, a, b):
-    """True if nothing solid sits between two tile centres."""
     x0, y0 = a
     x1, y1 = b
     dx, dy = abs(x1 - x0), abs(y1 - y0)
     sx = 1 if x0 < x1 else -1
     sy = 1 if y0 < y1 else -1
     err = dx - dy
-    while True:
-        if (x0, y0) == (x1, y1):
-            return True
+    while (x0, y0) != (x1, y1):
         e2 = 2 * err
         if e2 > -dy:
             err -= dy; x0 += sx
@@ -122,44 +145,70 @@ def los(g, a, b):
             err += dx; y0 += sy
         if g[y0][x0] == "#":
             return False
+    return True
 
 
-def visible_from(g, src, r):
-    """Tiles a guard standing here could see. FOV is ignored deliberately: a
-    guard sweeps as it turns and dwells, so the reachable-and-in-line set is
-    the honest measure of ground it covers over time."""
-    out = set()
+def visible_set(g, src, cache):
+    """Tiles in range of src with clear line of sight, ignoring facing.
+    Cached per tile - a patrol revisits the same tiles many times."""
+    if src in cache:
+        return cache[src]
+    out = []
     sx, sy = src
+    r = int(VISION_TILES)
     for y in range(max(1, sy - r), min(H - 1, sy + r + 1)):
         for x in range(max(1, sx - r), min(W - 1, sx + r + 1)):
             if g[y][x] == "#":
                 continue
-            if (x - sx) ** 2 + (y - sy) ** 2 > r * r:
+            ddx, ddy = x - sx, y - sy
+            if ddx * ddx + ddy * ddy > VISION_TILES * VISION_TILES:
                 continue
             if los(g, src, (x, y)):
-                out.add((x, y))
+                out.append(((x, y), math.atan2(ddy, ddx)))
+    cache[src] = out
     return out
 
 
-def tour(g, start, hostages, exit_t):
-    """Greedy nearest-first tour: spawn -> all hostages -> exit."""
-    route, cur, left = [], start, list(hostages)
-    while left:
-        d = dists(g, cur)
-        left.sort(key=lambda t: d.get(t, 10 ** 6))
-        nxt = left.pop(0)
-        seg = path_between(g, cur, nxt)
-        if seg is None:
-            return None
-        route += seg if not route else seg[1:]
-        cur = nxt
-    seg = path_between(g, cur, exit_t)
-    if seg is None:
-        return None
-    route += seg if not route else seg[1:]
-    return route
+def articulation_points(g, cells):
+    """Tarjan. Tiles whose removal splits the walkable graph."""
+    index, low, parent = {}, {}, {}
+    aps, counter = set(), [0]
+    for root in cells:
+        if root in index:
+            continue
+        stack = [(root, iter([(root[0] + d[0], root[1] + d[1]) for d in NB4]))]
+        index[root] = low[root] = counter[0]; counter[0] += 1
+        parent[root] = None
+        root_children = 0
+        while stack:
+            node, it = stack[-1]
+            advanced = False
+            for nb in it:
+                if not (0 <= nb[0] < W and 0 <= nb[1] < H) or g[nb[1]][nb[0]] == "#":
+                    continue
+                if nb not in index:
+                    parent[nb] = node
+                    index[nb] = low[nb] = counter[0]; counter[0] += 1
+                    if node == root:
+                        root_children += 1
+                    stack.append((nb, iter([(nb[0] + d[0], nb[1] + d[1]) for d in NB4])))
+                    advanced = True
+                    break
+                if nb != parent[node]:
+                    low[node] = min(low[node], index[nb])
+            if not advanced:
+                stack.pop()
+                if stack:
+                    up = stack[-1][0]
+                    low[up] = min(low[up], low[node])
+                    if parent[up] is not None and low[node] >= index[up]:
+                        aps.add(up)
+        if root_children > 1:
+            aps.add(root)
+    return aps
 
 
+# ------------------------------------------------------------- generation --
 def carve(rng, g, blocks):
     placed = 0
     for _ in range(blocks * 10):
@@ -193,10 +242,73 @@ def patrol_is_fair(g, start, a, b):
     return p
 
 
+def tour(g, start, hostages, exit_t):
+    route, cur, left = [], start, list(hostages)
+    while left:
+        d = dists(g, cur)
+        left.sort(key=lambda t: d.get(t, 10 ** 6))
+        nxt = left.pop(0)
+        seg = path_between(g, cur, nxt)
+        if seg is None:
+            return None
+        route += seg if not route else seg[1:]
+        cur = nxt
+    seg = path_between(g, cur, exit_t)
+    if seg is None:
+        return None
+    route += seg if not route else seg[1:]
+    return route
+
+
+def temporal_coverage(g, paths, cache):
+    """Per-tile probability that *some* guard can see it at a random moment.
+
+    Each guard is normalised by its own cycle length, then the guards are
+    combined as independent observers: 1 - prod(1 - c_i). Normalising by the
+    summed length of every guard's cycle instead - the obvious mistake - makes
+    a tile under one guard's constant watch score 1/N rather than 1, which
+    flattens the very signal this is here to measure.
+
+    The guard is walked out and back along its path, since patrols ping-pong,
+    facing its direction of travel, and dwelling at each end where the game
+    sweeps its facing rather than moving.
+    """
+    per_guard = []
+
+    for p in paths:
+        counts = collections.Counter()
+        steps = 0
+        seq = p + p[::-1][1:]
+        for i, tile in enumerate(seq):
+            nxt = seq[(i + 1) % len(seq)]
+            if nxt == tile:
+                headings = [0.0, math.pi / 2, math.pi, -math.pi / 2]
+            else:
+                headings = [math.atan2(nxt[1] - tile[1], nxt[0] - tile[0])]
+            if i == 0 or i == len(p) - 1:
+                base = headings[0]
+                headings = [base + k * 0.5 for k in (-1, 0, 1)] * CYCLE_STEPS
+
+            for facing in headings:
+                steps += 1
+                for (t, ang) in visible_set(g, tile, cache):
+                    d = (ang - facing + math.pi) % (2 * math.pi) - math.pi
+                    if abs(d) <= HALF_FOV:
+                        counts[t] += 1
+
+        if steps:
+            per_guard.append({t: c / steps for t, c in counts.items()})
+
+    combined = {}
+    for cov in per_guard:
+        for t, c in cov.items():
+            combined[t] = 1.0 - (1.0 - combined.get(t, 0.0)) * (1.0 - c)
+    return combined
+
+
 def build(rng, d):
-    """d: 0.0 .. 1.0 nominal difficulty, shaping the parameters."""
     g = blank()
-    carve(rng, g, 8 + int(d * 21))
+    carve(rng, g, int(6 + d * 26))
 
     fl = floors(g)
     if len(fl) < 150:
@@ -208,29 +320,27 @@ def build(rng, d):
         return None
 
     far = max(dd.values())
-    want = far * (0.6 + 0.35 * d)
-    exit_t = min(dd, key=lambda t: abs(dd[t] - want))
-    if dd[exit_t] < 14:
+    exit_t = min(dd, key=lambda t: abs(dd[t] - far * (0.6 + 0.35 * d)))
+    if dd[exit_t] < 12:
         return None
 
     n_host = min(MAX_HOSTAGES, 1 + int(d ** 1.1 * 3.4))
-    n_guard = min(MAX_GUARDS, 2 + int(d ** 0.75 * 6.2))
+    n_guard = min(MAX_GUARDS, 1 + int(d ** 0.7 * 7.2))
 
-    cands = [t for t in fl if dd.get(t, 0) >= 8 and t not in (start, exit_t)]
+    cands = [t for t in fl if dd.get(t, 0) >= 6 and t not in (start, exit_t)]
     rng.shuffle(cands)
     hostages = []
     for t in cands:
         if len(hostages) >= n_host:
             break
-        if all(abs(t[0] - h[0]) + abs(t[1] - h[1]) >= 8 for h in hostages):
+        if all(abs(t[0] - h[0]) + abs(t[1] - h[1]) >= 7 for h in hostages):
             hostages.append(t)
     if len(hostages) < n_host:
         return None
 
-    lo = 6 + int(d * 5)
-    hi = 14 + int(d * 10)
+    lo, hi = 5 + int(d * 5), 13 + int(d * 11)
     guards, paths, tries = [], [], 0
-    while len(guards) < n_guard and tries < 1200:
+    while len(guards) < n_guard and tries < 1400:
         tries += 1
         a = rng.choice(fl)
         da = dists(g, a)
@@ -243,8 +353,7 @@ def build(rng, d):
         p = patrol_is_fair(g, start, a, b)
         if p is None:
             continue
-        guards.append((a, b))
-        paths.append(p)
+        guards.append((a, b)); paths.append(p)
     if len(guards) < n_guard:
         return None
 
@@ -252,31 +361,51 @@ def build(rng, d):
     if rt is None:
         return None
 
-    # --- measure how exposed that tour actually is -----------------------
-    watch = collections.Counter()
-    for p in paths:
-        seen = set()
-        for i in range(0, len(p), 2):          # sample every other tile
-            seen |= visible_from(g, p[i], VISION_TILES)
-        for t in seen:
-            watch[t] += 1
+    # ---- measure -------------------------------------------------------
+    cache = {}
+    cov = temporal_coverage(g, paths, cache)
 
-    covered = sum(1 for t in rt if watch.get(t, 0) > 0)
-    exposure = covered / len(rt)
-    density = (sum(watch.get(t, 0) for t in rt) / len(rt)) / MAX_GUARDS
+    exposure = sum(cov.get(t, 0.0) for t in rt) / len(rt)
 
-    opens = sum(sum(1 for dx, dy in NB4 if g[t[1] + dy][t[0] + dx] != "#")
-                for t in fl) / len(fl)
-    tightness = 1.0 - (opens / 4.0)
+    # Unavoidable tiles: articulation points on the route whose removal
+    # actually severs the spawn from the exit.
+    aps = articulation_points(g, fl)
+    chokes = []
+    for t in set(rt) & aps:
+        if t in (start, exit_t) or t in hostages:
+            continue
+        if exit_t not in reachable(g, start, blocked=t):
+            chokes.append(t)
+    choke = max((cov.get(t, 0.0) for t in chokes), default=0.0)
 
-    bombs = max(1, 3 - int(d * 1.9))
+    safe = [t for t in fl if cov.get(t, 0.0) < 0.02]
+    safe_frac = len(safe) / len(fl)
 
-    score = (0.42 * exposure +
-             0.18 * min(1.0, density) +
-             0.14 * (len(guards) / MAX_GUARDS) +
-             0.12 * min(1.0, len(rt) / 90.0) +
-             0.09 * min(1.0, tightness * 2.2) -
-             0.05 * (bombs / 3.0))
+    # How far the route runs from anywhere unwatched.
+    if safe:
+        sd = collections.deque([(t, 0) for t in safe])
+        seen = {t: 0 for t in safe}
+        while sd:
+            (x, y), c = sd.popleft()
+            for dx, dy in NB4:
+                n = (x + dx, y + dy)
+                if n not in seen and 0 <= n[0] < W and 0 <= n[1] < H and g[n[1]][n[0]] != "#":
+                    seen[n] = c + 1
+                    sd.append((n, c + 1))
+        cover_dist = sum(seen.get(t, 12) for t in rt) / len(rt)
+    else:
+        cover_dist = 12.0
+
+    bombs = max(1, 3 - int(d * 1.7))
+    relief = min(1.0, bombs / max(1, len(guards)))
+
+    score = (0.30 * min(1.0, exposure * 1.6) +
+             0.24 * choke +
+             0.14 * (1.0 - safe_frac) +
+             0.12 * min(1.0, cover_dist / 6.0) +
+             0.12 * (len(guards) / MAX_GUARDS) +
+             0.08 * min(1.0, len(rt) / 90.0) -
+             0.10 * relief)
 
     g[start[1]][start[0]] = "@"
     g[exit_t[1]][exit_t[0]] = "E"
@@ -284,11 +413,11 @@ def build(rng, d):
         g[hy][hx] = "H"
 
     return {
-        "rows": ["".join(r) for r in g],
-        "guards": guards, "bombs": bombs,
+        "rows": ["".join(r) for r in g], "guards": guards, "bombs": bombs,
         "start": start, "exit": exit_t, "hostages": hostages,
-        "score": score, "exposure": exposure, "tour": len(rt),
-        "dwell": round(1.30 - d * 0.85, 2),
+        "score": score, "exposure": exposure, "choke": choke,
+        "safe": safe_frac, "cover": cover_dist, "tour": len(rt),
+        "chokes": len(chokes), "dwell": round(1.40 - d * 0.95, 2),
     }
 
 
@@ -300,6 +429,7 @@ def validate(lv):
     assert sum(r.count("@") for r in rows) == 1, "spawn"
     assert sum(r.count("E") for r in rows) == 1, "exit"
     assert sum(r.count("H") for r in rows) >= 1, "hostages"
+    assert len(lv["guards"]) <= MAX_GUARDS, "too many guards"
 
     grid = [list(r) for r in rows]
     reach = reachable(grid, lv["start"])
@@ -316,13 +446,12 @@ def validate(lv):
 
 def main():
     rng = random.Random(SEED)
-
     pool, attempts = [], 0
     while len(pool) < POOL:
         attempts += 1
-        if attempts > POOL * 300:
+        if attempts > POOL * 200:
             sys.exit("generator failed to converge")
-        d = (len(pool) / (POOL - 1)) ** 0.9
+        d = (len(pool) / (POOL - 1)) ** 0.85
         lv = build(rng, d)
         if lv is None:
             continue
@@ -331,18 +460,12 @@ def main():
         except AssertionError:
             continue
         pool.append(lv)
+        if len(pool) % 40 == 0:
+            print("  ...%d candidates" % len(pool), flush=True)
 
-    # Sorting by the measured score is what makes the ramp monotonic; the
-    # parameter sweep only ensures the pool spans a wide enough range.
     pool.sort(key=lambda l: l["score"])
-
-    # Drop the softest tail. These stages follow six hand-built tutorials, so
-    # the first generated one should already have teeth rather than repeating
-    # what the player just learned.
-    floor = int(len(pool) * 0.14)
-    usable = pool[floor:]
-    step = (len(usable) - 1) / (WANT - 1)
-    levels = [usable[int(round(i * step))] for i in range(WANT)]
+    step = (len(pool) - 1) / (WANT - 1)
+    levels = [pool[int(round(i * step))] for i in range(WANT)]
 
     names, used = [], set()
     while len(names) < WANT:
@@ -352,9 +475,9 @@ def main():
 
     out = ['// GENERATED by tools/gen_levels.py - do not edit by hand.',
            '//',
-           '// 94 procedural stages, following the 6 hand-built ones for 100 total.',
-           '// Ordered by a measured difficulty score dominated by how much of the',
-           '// route you must walk sits under guard vision. Regenerate with:',
+           '// 100 stages ordered by a measured difficulty score built from temporal',
+           '// guard coverage, unavoidable watched chokepoints, and how far the',
+           '// required route runs from cover. Regenerate with:',
            '//     python3 tools/gen_levels.py',
            '#include "game.h"', '',
            'const level_def_t g_levels_gen[] = {']
@@ -382,15 +505,15 @@ def main():
     out.append('')
     open('main/level_gen.c', 'w').write('\n'.join(out))
 
-    print("pool %d (%d attempts) -> %d stages" % (len(pool), attempts, len(levels)))
-    print(" stage  score  exposure  guards  hostages  bombs  tour")
-    for k in (0, 15, 31, 47, 63, 79, 93):
-        lv = levels[k]
-        print("  %3d   %.3f    %.2f       %d        %d       %d     %d" %
-              (k + 7, lv["score"], lv["exposure"], len(lv["guards"]),
-               len(lv["hostages"]), lv["bombs"], lv["tour"]))
+    print("\npool %d (%d attempts) -> %d stages" % (len(pool), attempts, len(levels)))
+    print(" stage  score  expo  choke  safe  cover  guards  host  bombs  tour")
+    for k in (0, 11, 24, 37, 49, 62, 74, 87, 99):
+        l = levels[k]
+        print("  %3d   %.3f  %.2f   %.2f  %.2f   %.1f      %d      %d      %d    %d" %
+              (k + 1, l["score"], l["exposure"], l["choke"], l["safe"],
+               l["cover"], len(l["guards"]), len(l["hostages"]), l["bombs"], l["tour"]))
     mono = all(levels[i]["score"] <= levels[i + 1]["score"] for i in range(WANT - 1))
-    print("monotonic difficulty:", mono)
+    print("monotonic:", mono)
 
 
 if __name__ == "__main__":

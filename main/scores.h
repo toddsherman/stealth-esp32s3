@@ -12,7 +12,11 @@ extern "C" {
 
 #define SCORES_MAX_LEVELS 128
 
-esp_err_t scores_init(void);
+// `set_id` identifies the stage table in use. Records are keyed by stage
+// index, so regenerating the stages silently reattaches every saved time to a
+// different map. Pass a value derived from the table and stored records are
+// discarded whenever it changes.
+esp_err_t scores_init(uint32_t set_id);
 
 // Best time for a stage. Returns false if nobody has cleared it yet.
 bool scores_get(int level, uint16_t *centis, char who[4]);

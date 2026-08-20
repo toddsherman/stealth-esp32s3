@@ -109,10 +109,8 @@ typedef struct {
     uint8_t      bombs;
 } level_def_t;
 
-// Six hand-built stages, then 100 generated ones (tools/gen_levels.py).
-// Always go through level_get() / level_count() rather than either array.
-extern const level_def_t g_levels[];
-extern const int         g_level_count;
+// All 100 stages are generated (tools/gen_levels.py) and ordered by measured
+// difficulty. Go through level_get() / level_count() rather than the array.
 extern const level_def_t g_levels_gen[];
 extern const int         g_level_gen_count;
 

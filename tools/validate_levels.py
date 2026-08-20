@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Static checks on the level tables.
 
-Runs over main/level.c and main/level_gen.c by default; pass paths to
-restrict it. The generated stages are validated at generation time too, but
-checking them here catches a bad regeneration or a hand-edit.
+Runs over main/level_gen.c by default; pass paths to restrict it. The stages
+are validated at generation time too, but checking them here catches a bad
+regeneration or a hand-edit.
 
 Catches the mistakes that are invisible when eyeballing ASCII maps:
 wrong row width, missing spawn/exit, and objectives walled off from the
@@ -12,7 +12,7 @@ player. Run before flashing.
 import re, sys, collections
 
 W, H = 23, 28
-paths = sys.argv[1:] or ["main/level.c", "main/level_gen.c"]
+paths = sys.argv[1:] or ["main/level_gen.c"]
 src = "\n".join(open(p).read() for p in paths)
 
 # Strip comments so map rows are the only quoted strings we see.
