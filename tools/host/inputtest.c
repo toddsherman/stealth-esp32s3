@@ -113,6 +113,50 @@ int main(void)
     check("every pixel of every drawn row hits that row", mismatch == 0);
     if (mismatch) printf("      %d sampled points resolved to the wrong row\n", mismatch);
 
+    // The exact tap that was reported as MISS from the board.
+    {
+        game_init(&g); hud_reset(); memset(&ts, 0, sizeof(ts));
+        g.phase = GS_PLAY; g.lvl = level_get(0);
+        frame(false, 0, 0, true);
+        const game_input_t in = frame(true, 329, 403, false);
+        frame(false, 0, 0, false);
+        check("the reported (329,403) tap resolves to QUIT", in.menu_row == 3);
+        check("(329,403) reaches the initials screen", g.phase == GS_INITIALS);
+    }
+
+    // No tap anywhere inside the panel below the title may be dead.
+    {
+        int dead = 0;
+        for (int y = ROW0; y < MY + MENU_H; y += 3) {
+            for (int x = MX; x < MX + MENU_W; x += 24) {
+                game_init(&g); hud_reset(); memset(&ts, 0, sizeof(ts));
+                g.phase = GS_PLAY; g.lvl = level_get(0);
+                frame(false, 0, 0, true);
+                if (frame(true, x, y, false).menu_row < 0) dead++;
+                frame(false, 0, 0, false);
+            }
+        }
+        check("no dead taps anywhere in the panel's row area", dead == 0);
+        if (dead) printf("      %d sampled points hit nothing\n", dead);
+    }
+
+    // Quitting after GO has already been pressed once. game_input_t is reused
+    // across frames by the caller, so a flag left set from an earlier frame
+    // fires again: initials_done stayed true after the first GO press and
+    // bounced every later visit to the initials screen back to the title.
+    {
+        game_init(&g); hud_reset(); memset(&ts, 0, sizeof(ts));
+        tap_throws(INIT_GO_X + INIT_GO_W / 2, INIT_SLOT_Y + INIT_SLOT_H / 2);
+        idle(40);                                   // now on the title
+        frame(false, 0, 0, true);                   // open the menu
+        frame(true, PLAY_W / 2, ROW0 + 3 * ROW_H + 40, false);   // QUIT
+        frame(false, 0, 0, false);
+        check("QUIT after a GO press reaches initials", g.phase == GS_INITIALS);
+        idle(30);
+        check("and stays there instead of bouncing to the title",
+              g.phase == GS_INITIALS);
+    }
+
     // ---- QUIT from every phase -------------------------------------------
     static const char *PN[] = {"INITIALS","TITLE","BRIEF","PLAY","CAUGHT","CLEAR","WIN"};
     for (int p = GS_TITLE; p <= GS_WIN; p++) {

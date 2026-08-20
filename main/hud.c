@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 
 // Input model
 // -----------
@@ -44,11 +45,6 @@ static bool  s_holding;
 static float s_hold_t;
 static float s_toast_t;
 
-// Last menu tap, shown in the menu footer. Serial is not reachable while the
-// board is in hand, so the diagnosis has to be legible on the panel itself.
-static int16_t s_dbg_x = -1, s_dbg_y = -1;
-static int8_t  s_dbg_row = -2;
-
 void hud_reset(void)
 {
     s_holding = false;
@@ -69,25 +65,31 @@ static bool in_rect(int x, int y, int rx, int ry, int rw, int rh)
 static int menu_row_at(int x, int y)
 {
     if (x < MENU_X || x >= MENU_X + MENU_W) return -1;
-    const int dy = y - MENU_ROW0_Y;
-    if (dy < 0) return -1;
-    const int row = dy / MENU_ROW_H;
-    return (row < MENU_ITEMS) ? row : -1;
+    if (y < MENU_ROW0_Y || y >= MENU_Y + MENU_H) return -1;
+
+    const int row = (y - MENU_ROW0_Y) / MENU_ROW_H;
+
+    // Anything below the last row but still inside the panel belongs to that
+    // row. The rows stop at y=385 while the panel runs to 415, and that
+    // 30px strip - which carries only a caption - was swallowing taps aimed
+    // at the bottom item. A real tap on QUIT reported (329,403) and missed.
+    return (row < MENU_ITEMS) ? row : (MENU_ITEMS - 1);
 }
 
 void hud_build_input(game_input_t *in, const touch_state_t *ts,
                      float tilt_x, float tilt_y, bool menu_button,
                      game_t *g, float dt)
 {
-    in->mx = in->my = 0.0f;
-    in->throw_now   = false;
-    in->recalibrate = false;
-    in->restart     = false;
-    in->quit        = false;
-    in->menu_toggle = menu_button;
-    in->menu_tapped = false;
+    // Clear the whole struct, not field by field. The caller reuses one
+    // game_input_t across every frame, so any flag left set from a previous
+    // frame fires again. initials_done did exactly that: it stayed true after
+    // the first GO press, so every later arrival at the initials screen was
+    // bounced straight back to the title on the very next frame - which is
+    // what made QUIT look like it did nothing.
+    memset(in, 0, sizeof(*in));
     in->menu_row    = -1;
-    in->tap = ts->pressed;
+    in->menu_toggle = menu_button;
+    in->tap         = ts->pressed;
 
     if (s_toast_t > 0.0f) s_toast_t -= dt;
 
@@ -110,7 +112,6 @@ void hud_build_input(game_input_t *in, const touch_state_t *ts,
     if (g->menu_open) {
         if (ts->pressed) {
             const int row = menu_row_at(ts->x, ts->y);
-            s_dbg_x = ts->x; s_dbg_y = ts->y; s_dbg_row = (int8_t)row;
             in->menu_tapped = true;
             in->menu_tap_x  = ts->x;
             in->menu_tap_y  = ts->y;
@@ -427,17 +428,8 @@ static void draw_menu(gfx_surf_t *s, const game_t *g)
         gfx_text_centered(s, PLAY_W / 2, ry + 22, s_menu_labels[i], COL_PLAYER, 4);
     }
 
-    if (s_dbg_row == -2) {
-        gfx_text_centered(s, PLAY_W / 2, MENU_Y + MENU_H - 24,
-                          "BUTTON TO CLOSE", COL_TEXT_DIM, 2);
-    } else {
-        char dbg[40];
-        static const char *RN[] = { "RESUME", "RELEVEL", "RESTART", "QUIT" };
-        snprintf(dbg, sizeof(dbg), "%d,%d %s", s_dbg_x, s_dbg_y,
-                 (s_dbg_row >= 0 && s_dbg_row < 4) ? RN[s_dbg_row] : "MISS");
-        gfx_text_centered(s, PLAY_W / 2, MENU_Y + MENU_H - 24, dbg,
-                          (s_dbg_row >= 0) ? COL_EXIT : COL_ALERT, 2);
-    }
+    gfx_text_centered(s, PLAY_W / 2, MENU_Y + MENU_H - 24,
+                      "BUTTON TO CLOSE", COL_TEXT_DIM, 2);
 }
 
 void hud_render(gfx_surf_t *s, const game_t *g)
