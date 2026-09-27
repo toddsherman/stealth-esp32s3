@@ -5,7 +5,7 @@
 // sit in front of them are gone: they were a fixed difficulty spliced onto the
 // front of a ramp, which put a discontinuity exactly where the curve should
 // have been gentlest. The generated set starts easy enough to learn on - stage
-// 1 is one guard, one hostage, and no part of the route under watch.
+// 1 is two guards and one hostage, with a single briefly-watched crossing.
 #include "game.h"
 
 int level_count(void)

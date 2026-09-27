@@ -5,7 +5,8 @@ CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
 CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
 CONFIG_PARTITION_TABLE_SINGLE_APP_LARGE=y
 
-# --- PSRAM: octal @80MHz. Framebuffers live here (2 x 322KB). -------------
+# --- PSRAM: octal @80MHz, for the heap. Frames are NOT rendered here: -----
+# --- main.c draws into internal-SRAM bands, since DMA from PSRAM underruns.
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y

@@ -1,6 +1,7 @@
-# Stealth — ESP32-S3 Touch AMOLED 1.8
+# Stealth — a tilt-controlled stealth game for the ESP32-S3 AMOLED 1.8
 
-A realtime-tactics stealth puzzler for the Waveshare ESP32-S3-Touch-AMOLED-1.8
+A realtime-tactics stealth puzzler that runs entirely on a palm-sized
+[Waveshare ESP32-S3-Touch-AMOLED-1.8](https://www.waveshare.com/wiki/ESP32-S3-Touch-AMOLED-1.8)
 (SKU 29957), inspired by [Stealth](https://store.steampowered.com/app/2168090/Stealth/).
 
 Guards sweep vision cones across a tile maze. You tilt the board to move,
@@ -8,7 +9,103 @@ throw sound bombs to pull guards off their patrol, free the hostages, and
 reach the exit without ever being fully seen. A heartbeat in the speaker rises
 as a guard closes in on identifying you.
 
+Everything runs on the board itself: 100 stages ordered by a measured
+difficulty model, a software rasteriser redrawing the whole AMOLED panel at
+50 FPS, a live synthesiser for every sound (there are no audio samples), and
+per-stage best times saved to flash. Plain C on ESP-IDF 5.5, no other
+frameworks.
+
 ![preview](docs/preview.png)
+
+## Hardware
+
+The game needs nothing but the one board — no wiring, no add-ons. Plug it in
+over USB-C and flash.
+
+| | |
+|---|---|
+| **Board** | Waveshare ESP32-S3-Touch-AMOLED-1.8 (SKU 29957) |
+| **SoC** | ESP32-S3R8 — dual-core Xtensa LX7 at 240 MHz, 512 KB SRAM, Wi-Fi and Bluetooth LE 5 |
+| **Memory** | 8 MB octal PSRAM (in package), 16 MB flash |
+| **Display** | 1.8" AMOLED, 368 × 448, QSPI — SH8601 or CO5300 driver depending on revision |
+| **Touch** | Capacitive — FT3168 or CST816 depending on revision, over I²C |
+| **Motion** | QMI8658 6-axis IMU (accelerometer and gyroscope) |
+| **Audio** | ES8311 codec, onboard amplifier and speaker, microphone |
+| **IO expander** | TCA9554 — the panel and touch reset lines hang off this, not off GPIO |
+| **Buttons** | BOOT and PWR, on the side |
+| **Power** | USB-C, or a 3.7 V Li-ion cell on the MX1.25 connector (AXP2101 PMIC) |
+| **Also on board** | PCF85063 RTC, TF card slot |
+
+### What the game uses
+
+| Part | Role in the game | Code |
+|---|---|---|
+| AMOLED panel | the whole play field, fully redrawn every frame | [`board.c`](main/board.c), `espressif/esp_lcd_co5300` |
+| Accelerometer | movement — tilt is the joystick | [`imu.c`](main/imu.c), `waveshare/qmi8658` |
+| Touch | tap to throw a bomb, hold to reveal patrol routes, menus | [`touch.c`](main/touch.c) |
+| ES8311 + speaker | alarm, heartbeat, music, effects — all synthesised live | [`audio.c`](main/audio.c), [`synth.c`](main/synth.c), `espressif/esp_codec_dev` |
+| BOOT button | pause menu, on every screen | [`button.c`](main/button.c) |
+| Flash (NVS) | player initials and the best time on every stage | [`scores.c`](main/scores.c) |
+
+The gyroscope, microphone, RTC, TF card slot, battery management and radios
+are present but unused.
+
+### Board revisions
+
+Two revisions ship under the same SKU. The firmware tells them apart at boot
+by probing the touch controller's I²C address, so one binary runs on both:
+
+| | V1 | V2 |
+|---|---|---|
+| Panel | SH8601 | CO5300 (+16px column offset) |
+| Touch | FT3168 @ `0x38` | CST816 @ `0x15` |
+
+Both panels take the same command set, and both touch controllers are
+FocalTech-derived with an identical register block for the first contact — so
+a single 5-byte read at `0x02` serves either.
+
+### Pin map
+
+| Function | GPIO |
+|---|---|
+| LCD QSPI CS / CLK | 12 / 11 |
+| LCD QSPI D0–D3 | 4, 5, 6, 7 |
+| I²C SDA / SCL (400 kHz) | 15 / 14 |
+| Touch interrupt | 21 |
+| I²S MCLK / BCLK / WS | 16 / 9 / 45 |
+| I²S DOUT (to codec) / DIN (from mic, unused) | 8 / 10 |
+| Speaker amplifier enable | 46 |
+| BOOT button | 0 |
+
+One I²C bus carries the IO expander (`0x20`), the touch controller, the IMU
+(`0x6B`, or `0x6A` on some units) and the codec's control port.
+
+### Things about this board that cost real debugging time
+
+1. **DMA straight from PSRAM needs an opt-in.** The SPI driver only accepts an
+   external-RAM source when the transaction carries `SPI_TRANS_DMA_USE_PSRAM`,
+   which esp_lcd sets only if you enable `flags.psram_dma_direct`. Without it
+   the driver tries to bounce the whole frame through a 322KB *internal*
+   buffer, which cannot be allocated, and you get
+   `setup_dma_priv_buffer: Failed to allocate priv TX buffer`.
+
+2. **…and even then, don't.** With framebuffers in PSRAM, DMA reading one
+   while the CPU rasterises into the other saturates the PSRAM bus and the SPI
+   peripheral underruns (`DMA TX underflow detected`). The renderer instead
+   draws into two small internal-SRAM bands that ping-pong, so drawing and
+   transfer overlap without ever sharing a bus.
+
+3. **The speaker cannot reproduce bass.** It rolls off hard below roughly
+   300–400Hz, so every sound is pitched for it rather than for headphones —
+   see [Sound](#sound).
+
+4. **The panel is a rounded rectangle**, not the square its framebuffer
+   implies. See [Screen layout](#screen-layout).
+
+5. **If tilt comes out mirrored**, the IMU's physical orientation relative to
+   the panel is the only variable. Flip `IMU_SWAP_XY` / `IMU_INVERT_X` /
+   `IMU_INVERT_Y` in [`main/imu.h`](main/imu.h); everything downstream is
+   already in screen space.
 
 ## The idea
 
@@ -27,8 +124,9 @@ moment is survivable; standing in the middle of one is not. The meter traces
 the panel's own outline: it starts at bottom centre, runs outward both ways,
 rounds the lower corners, climbs both sides, rounds the upper corners, and the
 two ends meet at top centre at the instant you are identified. It reads in
-peripheral vision without looking away from the guard about to see you. You can hear it happening too:
-the heartbeat's rate and volume both track the closest guard's certainty.
+peripheral vision without looking away from the guard about to see you. You
+can hear it happening too: the heartbeat's rate and volume both track the
+closest guard's certainty.
 
 Once you *are* seen, running is not an escape. A chasing guard moves at least
 as fast as you are currently moving, so the only way out is to break line of
@@ -41,7 +139,7 @@ sight.
 | Move | **Tilt the board.** Speed rises continuously with the angle |
 | Throw a sound bomb | **Tap** the field where you want it to land |
 | Reveal patrol routes | **Press and hold** the field |
-| Pause menu | **BOOT button** (GPIO0), on any screen — Resume, Re-level, Restart, Quit |
+| Pause menu | **BOOT button**, on any screen after initials — Resume, Re-level, Restart, Quit |
 | Menus | Tap |
 
 Throwing resolves on *release*, not on press: until the finger lifts, a tap
@@ -56,32 +154,47 @@ Speed is a continuous function of tilt angle, not a walk/run toggle: a slight
 lean creeps, a hard lean sprints at 205 px/s. Past `SPRINT_THRESHOLD` your
 footsteps start carrying, so the fastest route is rarely the quiet one.
 
-The IMU reports tilt relative to a captured neutral, so you can play at any
-comfortable angle. Tap the map to rebase neutral to however you're holding it.
+Tilt is measured relative to a captured neutral, so you can play at any
+comfortable angle. Neutral is captured at boot; choose
+**Re-level** from the pause menu to reset it to however you are holding the
+board now.
 
 ## Build and flash
 
-Requires ESP-IDF v5.5+. The build directory is kept outside the project
-because this tree lives in iCloud Drive and syncing thousands of object files
-is miserable.
+Requires ESP-IDF v5.5+. On a machine that has never built the project:
 
 ```bash
-./flash.sh
+./tools/bootstrap.sh
 ```
 
-Or manually:
+That checks for ESP-IDF, installs v5.5.5 if it is missing (no sudo), fetches
+the pinned components, builds, and runs the whole off-device test suite.
+
+After that:
+
+```bash
+./tools/check.sh    # every off-device test - no board needed
+./flash.sh          # validate stages, build, flash
+```
+
+`flash.sh` picks the first `/dev/cu.usbmodem*` port and builds in
+`/tmp/stealth-build`, outside the source tree; override either with `PORT=`
+or `BUILD_DIR=`. Or by hand:
 
 ```bash
 source ~/esp/esp-idf/export.sh && idf.py -B /tmp/stealth-build -p /dev/cu.usbmodem1101 flash monitor
 ```
+
+Component versions are pinned in [`dependencies.lock`](dependencies.lock):
+`esp_lcd_co5300` 2.1.0, `esp_codec_dev` 1.6.2, `qmi8658` 2.0.0.
 
 ## Stages and records
 
 100 stages, all generated by [`tools/gen_levels.py`](tools/gen_levels.py) and
 ordered by a measured difficulty score. There is no hand-built prologue: a
 fixed-difficulty block spliced onto the front of a ramp puts a discontinuity
-exactly where the curve should be gentlest. Stage 1 is one guard, one hostage,
-and no part of the route under watch.
+exactly where the curve should be gentlest. Stage 1 is two guards, one hostage
+and three bombs, with a single briefly-watched crossing to time.
 
 ### Predicting how hard a stage is
 
@@ -101,7 +214,7 @@ scored. What is scored is how hard the level is to actually move through:
 - **Unavoidable watched chokepoints.** Articulation points whose removal
   disconnects spawn from exit, that also lie on the required tour. You cannot
   route around these, only time them, which is the hardest thing the game asks.
-  Scored by the coverage of the worst one — 0.00 at stage 1, **0.83** at 100.
+  Scored by the coverage of the worst one — 0.00 at stage 1, **0.92** at 100.
 - **Cover.** How much of the map is never watched, and how far the route runs
   from the nearest unwatched tile. A chasing guard matches your speed, so
   breaking line of sight is the only escape; a route with no cover beside it
@@ -127,16 +240,15 @@ healthy average exposure on the direct path and still have a completely safe
 detour beside it.
 
 The floor is 0.16 — even stage 1 forces you across ground watched at least 16%
-of a patrol cycle, and no stage has fewer than two guards. Measured across the
-100, that bottleneck rises 0.16 → 0.92.
+of a patrol cycle, and no stage has fewer than two guards.
 
 Measured across the 100: forced crossing 0.16 → 0.92, worst choke 0.00 → 0.92,
-guards 2 → 7, hostages 1 → 4. Candidates are sorted by
-score and sampled evenly, so the ramp is monotonic by construction.
+guards 2 → 7, hostages 1 → 4. Candidates are sorted by score and sampled
+evenly, so the ramp is monotonic by construction.
 
 Fairness overrides difficulty: sealed border, fully connected floor, reachable
 exit/hostages/waypoints, and no patrol may pass within vision range of the
-spawn. Deterministic — regenerating reproduces the same stages.
+spawn. Deterministic — regenerating reproduces the same stages byte for byte.
 
 ### Records
 
@@ -162,8 +274,9 @@ panel outline.
 
 The panel is a rounded rectangle, not the square its framebuffer implies:
 28.70mm of glass across 368px is 12.8px/mm, and the corner measures about 4mm,
-so `SCREEN_CORNER_R` is 52px. The alert trace follows that curve — a square
-path would disappear under the bezel at every corner.
+so `SCREEN_CORNER_R` is 52px. Anything drawn outside that curve sits under the
+bezel and is never seen. The alert trace follows it — a square path would
+disappear at every corner.
 
 When the last hostage is freed and the exit unlocks, a ring far wider than the
 panel collapses onto the exit over 500ms — the one moment worth interrupting
@@ -196,64 +309,19 @@ sums a fundamental with its 2nd and 3rd harmonics — the harmonics land where
 the speaker can move air and the ear still infers the missing fundamental.
 The result moved the bed from 8.6% to 68.7% of its energy above 300Hz.
 
-`tools/host/synthwav.c` renders the real synth to a WAV, which is how that was
-measured without a speaker in hand.
-
 The inner loop uses a 1024-entry sine table and multiplicative envelopes
 rather than `sinf`/`expf` per sample, which is what leaves room for a
 continuous music bed under the one-shot effects.
 
-`synth.c` deliberately has no platform dependencies, so the exact code driving
-the speaker can be rendered to a WAV and inspected without hardware:
-
-```bash
-clang -O2 -std=c11 -I main tools/host/synthwav.c main/synth.c -lm -o /tmp/synthwav && /tmp/synthwav out.wav
-```
-
 The game thread and the audio task never share a lock — one-shot effects cross
 between them through a single-producer/single-consumer ring, so a slow frame
-can never stall audio and a busy synth can never stall a frame.
-
-## Hardware notes
-
-Both board revisions are detected at runtime by probing the touch controller,
-so one binary covers either:
-
-| | V1 | V2 |
-|---|---|---|
-| Panel | SH8601 | CO5300 (+16px column gap) |
-| Touch | FT3168 @ 0x38 | CST816 @ 0x15 |
-
-Both panels take the same command set, and both touch controllers are
-FocalTech-derived with an identical register block for the first contact — so
-a single 5-byte read at `0x02` serves either. Panel and touch reset lines hang
-off a TCA9554-style IO expander at `0x20`, not off GPIO.
-
-Three things about this board that cost real debugging time, recorded here so
-they don't have to be rediscovered:
-
-1. **DMA straight from PSRAM needs an opt-in.** The SPI driver only accepts an
-   external-RAM source when the transaction carries `SPI_TRANS_DMA_USE_PSRAM`,
-   which esp_lcd sets only if you enable `flags.psram_dma_direct`. Without it
-   the driver tries to bounce the whole frame through a 322KB *internal*
-   buffer, which cannot be allocated, and you get
-   `setup_dma_priv_buffer: Failed to allocate priv TX buffer`.
-
-2. **…and even then, don't.** With framebuffers in PSRAM, DMA reading one
-   while the CPU rasterises into the other saturates the PSRAM bus and the SPI
-   peripheral underruns (`DMA TX underflow detected`). The renderer instead
-   draws into two small internal-SRAM bands that ping-pong, so drawing and
-   transfer overlap without ever sharing a bus.
-
-3. **If tilt comes out mirrored**, the IMU's physical orientation relative to
-   the panel is the only variable. Flip `IMU_SWAP_XY` / `IMU_INVERT_X` /
-   `IMU_INVERT_Y` in [`main/imu.h`](main/imu.h); everything downstream is
-   already in screen space.
+can never stall audio and a busy synth can never stall a frame. Audio runs on
+core 1; the game loop and renderer own core 0.
 
 ## Performance
 
-368×448, fully redrawn every frame, on the busiest level (5 guards, 3
-hostages), measured on device:
+368×448, fully redrawn every frame, measured on device on a 5-guard,
+3-hostage stage with the alert meter active:
 
 | | |
 |---|---|
@@ -261,12 +329,12 @@ hostages), measured on device:
 | Cone raycasting | 1.5 ms |
 | Rasterising (4 bands) | 6.7 ms |
 | QSPI DMA wait | 9.5 ms |
-| Binary | 294 KB (81% of the partition free) |
+| Binary | 449 KB (71% of the app partition free) |
 | Internal heap free | 110 KB |
 | Main task stack peak | 2.4 KB of 8 KB |
 
-Measured on the heaviest stage with the alert meter active. Three changes took
-it from 34.5 to 50 FPS:
+The current stage set peaks at 7 guards and has not been re-measured since it
+was generated. Three changes took the frame from 34.5 to 50 FPS:
 
 - **Band height 32 → 112 rows** (14 bands → 4). Every band costs a synchronous
   window-set round trip before its pixels can stream, and that protocol
@@ -279,73 +347,96 @@ it from 34.5 to 50 FPS:
 - **Tile loops clipped to the band**, plus 32-bit-wide solid fills. Rasterising
   went 14.5ms → 6.7ms.
 
-QSPI still runs at the vendor-validated 40MHz, a 16.5ms floor for a full frame.
-Raising it is the one remaining lever — `CO5300_PANEL_IO_QSPI_CONFIG` in
-[`main/board.c`](main/board.c) — but signal integrity can only be judged by
-looking at the panel, so it is left at the safe default.
+The frame is now bus-bound. QSPI still runs at the vendor-validated 40MHz, a
+16.5ms floor for a full frame. Raising it is the one remaining lever —
+`CO5300_PANEL_IO_QSPI_CONFIG` in [`main/board.c`](main/board.c) — but signal
+integrity can only be judged by looking at the panel, so it is left at the
+safe default.
 
-## Layout
+## Project layout
 
 ```
 main/
-  board.c     panel bring-up, revision detect, IO expander
-  touch.c     unified FT3168 / CST816 driver
-  imu.c       QMI8658 tilt, filtering, levelling
-  audio.c     ES8311 + I2S bring-up (thin platform shim)
-  synth.c     portable synthesiser: heartbeat and effects
-  gfx.c       RGB565 software rasteriser (device-order pixels)
-  font.c      5x7 bitmap font
-  game.c      state, player, noise flood-fill, bombs
-  guard.c     patrol / investigate / look / chase, BFS pathing
-  level.c     the six levels
-  render.c    world and overlay drawing
-  hud.c       tilt input mapping, HUD
+  main.c        init and the frame loop: banded rendering, events -> sound
+  board.c       panel bring-up, revision detect, IO expander
+  touch.c       unified FT3168 / CST816 driver
+  imu.c         QMI8658 tilt, filtering, levelling
+  audio.c       ES8311 + I2S bring-up (thin platform shim)
+  button.c      debounced BOOT button
+  scores.c      initials and per-stage records in NVS
+  synth.c       portable synthesiser: alarm, heartbeat, music, effects
+  gfx.c         RGB565 software rasteriser (device-order pixels)
+  font.c        5x7 bitmap font
+  game.c        state, player, noise flood-fill, bombs, pathfinding
+  guard.c       patrol / investigate / look / chase
+  level.c       stage table access
+  level_gen.c   the 100 generated stages - regenerate, don't hand-edit
+  render.c      world and overlay drawing
+  hud.c         input mapping, pause menu, initials entry, alert trace
 tools/
-  validate_levels.py   static checks on the maps
-  host/preview.c       runs the real game code natively, writes frames
-  host/synthwav.c      renders the real synth to a WAV
-  host/routecheck.c    regression checks on the patrol-route overlay
-  host/smoke.c         loads and simulates all 106 stages
-  host/legend.c        renders docs/legend.png
+  bootstrap.sh         first-run setup: ESP-IDF, components, build, tests
+  check.sh             every off-device test in one command
+  gen_levels.py        the stage generator and difficulty model
+  validate_levels.py   static checks on the stage table
   ppm2png.py           PPM -> PNG, no dependencies
+  host/                the game's own C, compiled natively
+    inputtest.c        input handling and menu hit-test geometry
+    routecheck.c       patrol-route overlay regression checks
+    smoke.c            loads and simulates all 100 stages
+    soak.c             long-run numerical soak
+    preview.c          renders real frames without a flash cycle
+    legend.c           renders docs/legend.png
+    synthwav.c         renders the real synth to a WAV
 ```
 
-### Working on the levels
+## Testing without hardware
 
-The maps are 23×25 ASCII grids in [`main/level.c`](main/level.c). A single
-miscounted character is invisible by eye, so validate before flashing:
+The game core — `game.c`, `guard.c`, `gfx.c`, `render.c`, `hud.c`, `level*.c`
+and `synth.c` — has no ESP-IDF dependencies. Platform code passes data *in*
+(tilt, touch, button) rather than the core calling *out*, so the same sources
+compile natively against a stub `esp_err.h` in `tools/host/`. That is what
+makes the whole test suite possible without a board:
 
 ```bash
-python3 tools/validate_levels.py
+./tools/check.sh
 ```
 
-It checks row widths, sealed borders, exactly one spawn and exit, and — via
-flood fill — that every hostage, the exit, and every guard waypoint is
-actually reachable from the player's start.
+It runs, and exits non-zero if any fail:
 
-`tools/host/soak.c` runs 108,000 simulated frames across a dozen stages and
-four minutes of audio, checking for NaN, infinities and out-of-bounds
-positions — the kind of accumulated float drift that only appears in a long
-session and never in a short test.
+- **`validate_levels.py`** — row widths, sealed borders, exactly one spawn and
+  exit, and — via flood fill — that every hostage, the exit, and every guard
+  waypoint is actually reachable from the player's start. A single miscounted
+  character in a map is invisible by eye.
+- **`inputtest.c`** — tap/hold/throw resolution and menu hit-testing, including
+  that QUIT from every screen reaches the initials entry.
+- **`routecheck.c`** — that the patrol-route polyline never blends a pixel
+  twice (on one surface *and* through a banded render, using 14 bands — stricter
+  than the device's 4), and that the route drawn is the route walked: a guard is
+  simulated along its patrol and every tile it occupies must lie on the drawn
+  corridor.
+- **`smoke.c`** — loads and simulates every stage, and asserts that no guard
+  can see the player at the moment a stage begins. That check caught a
+  generated stage which spotted and captured the player within 1.5 seconds of
+  starting, before they had moved.
+- **`soak.c`** — 108,000 simulated frames across a dozen stages and four
+  minutes of audio, checking for NaN, infinities and out-of-bounds positions —
+  the kind of accumulated float drift that only appears in a long session and
+  never in a short test.
 
-`tools/host/smoke.c` loads and simulates every stage, and asserts that no
-guard can see the player at the moment a stage begins. That check caught a
-generated stage which spotted and captured the player within 1.5 seconds of
-starting, before they had moved.
-
-`tools/host/routecheck.c` covers the patrol-route overlay: that its polyline
-never blends a pixel twice (on one surface *and* through the 14-band path the
-device uses), and that the route drawn is the route walked — a guard is
-simulated along its patrol and every tile it occupies must lie on the drawn
-corridor. It exits non-zero on failure.
-
-The game core is plain C with no ESP dependencies, so it also runs natively.
-This renders real frames from the real code without a flash cycle:
+The harnesses also render. This produces real frames from the real code
+without a flash cycle:
 
 ```bash
 clang -O2 -std=c11 -I main -I tools/host tools/host/preview.c \
-  main/gfx.c main/font.c main/game.c main/guard.c main/level.c \
+  main/gfx.c main/font.c main/game.c main/guard.c main/level.c main/level_gen.c \
   main/render.c main/hud.c -lm -o /tmp/stealth_preview && /tmp/stealth_preview /tmp/shots
+```
+
+and this renders the exact code driving the speaker to a WAV, which is how the
+speaker-passband work above was measured without a speaker in hand:
+
+```bash
+clang -O2 -std=c11 -I main tools/host/synthwav.c main/synth.c -lm -o /tmp/synthwav && /tmp/synthwav out.wav
 ```
 
 ## Failure handling
@@ -373,6 +464,8 @@ codec framework closing a channel it has not opened yet. It is benign.
 
 ## Possible next steps
 
-- Save progress to NVS so level unlocks survive a reboot
+- Remember the furthest stage reached, so a session can resume there rather
+  than at stage 1 (records already persist; progress does not)
 - Guards that hear *each other* — a chasing guard alerting nearby patrols
 - Use the gyro as well as the accelerometer, so quick flicks read as intent
+- Re-measure frame time on the heaviest 7-guard stages
