@@ -1,0 +1,41 @@
+name: Build and tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  host-tests:
+    name: Host tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Run all six off-device suites
+        run: ./tools/check.sh
+
+  firmware:
+    name: ESP32-S3 firmware (ESP-IDF 5.5.5)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container: espressif/idf:v5.5.5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build firmware from checked-in defaults
+        shell: bash
+        run: |
+          . "$IDF_PATH/export.sh"
+          idf.py build
