@@ -474,3 +474,7 @@ codec framework closing a channel it has not opened yet. It is benign.
 - Guards that hear *each other* — a chasing guard alerting nearby patrols
 - Use the gyro as well as the accelerometer, so quick flicks read as intent
 - Re-measure frame time on the heaviest 7-guard stages
+
+## License
+
+[MIT](LICENSE) © 2026 Todd Sherman
