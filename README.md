@@ -333,8 +333,8 @@ core 1; the game loop and renderer own core 0.
 | Internal heap free | 110 KB |
 | Main task stack peak | 2.4 KB of 8 KB |
 
-The current stage set peaks at 7 guards and has not been re-measured since it
-was generated. Three changes took the frame from 34.5 to 50 FPS:
+The current stage set peaks at 8 guards (stage 99) and has not been
+re-measured since it was generated. Three changes took the frame from 34.5 to 50 FPS:
 
 - **Band height 32 → 112 rows** (14 bands → 4). Every band costs a synchronous
   window-set round trip before its pixels can stream, and that protocol
@@ -387,6 +387,7 @@ tools/
     soak.c             long-run numerical soak
     tilttest.c         tilt filtering and levelling
     preview.c          renders real frames without a flash cycle
+    capture.c          an autopilot run of any stage, as frames plus audio
     legend.c           renders docs/legend.png
     synthwav.c         renders the real synth to a WAV
 ```
@@ -437,7 +438,12 @@ clang -O2 -std=c11 -I main -I tools/host tools/host/preview.c \
   main/render.c main/hud.c -lm -o /tmp/stealth_preview && /tmp/stealth_preview /tmp/shots
 ```
 
-and this renders the exact code driving the speaker to a WAV, which is how the
+`tools/host/capture.c` goes further: an autopilot plays a whole stage and the
+recorder writes every frame plus the synth's audio for the same run, which is
+how the gameplay video on [todd.sh/StealthGame](https://www.todd.sh/StealthGame)
+was made. Its header has the build and encode commands.
+
+And this renders the exact code driving the speaker to a WAV, which is how the
 speaker-passband work above was measured without a speaker in hand:
 
 ```bash
@@ -473,7 +479,7 @@ codec framework closing a channel it has not opened yet. It is benign.
   than at stage 1 (records already persist; progress does not)
 - Guards that hear *each other* — a chasing guard alerting nearby patrols
 - Use the gyro as well as the accelerometer, so quick flicks read as intent
-- Re-measure frame time on the heaviest 7-guard stages
+- Re-measure frame time on the heaviest 8-guard stages
 
 ## License
 
