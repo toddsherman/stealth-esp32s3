@@ -4,14 +4,14 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 CORE=(main/gfx.c main/font.c main/game.c main/guard.c main/level.c
-      main/level_gen.c main/render.c main/hud.c main/synth.c)
+      main/level_gen.c main/render.c main/hud.c main/synth.c main/tilt.c)
 OUT=${TMPDIR:-/tmp}
 fails=0
 
 echo "== level tables =="
 python3 tools/validate_levels.py | tail -2 || fails=$((fails+1))
 
-for t in inputtest routecheck smoke soak; do
+for t in inputtest routecheck smoke soak tilttest; do
   echo
   echo "== $t =="
   if ! clang -O2 -std=c11 -Wall -Wextra -I main -I tools/host \

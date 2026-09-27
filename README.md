@@ -41,7 +41,7 @@ over USB-C and flash.
 | Part | Role in the game | Code |
 |---|---|---|
 | AMOLED panel | the whole play field, fully redrawn every frame | [`board.c`](main/board.c), `espressif/esp_lcd_co5300` |
-| Accelerometer | movement — tilt is the joystick | [`imu.c`](main/imu.c), `waveshare/qmi8658` |
+| Accelerometer | movement — tilt is the joystick | [`imu.c`](main/imu.c), [`tilt.c`](main/tilt.c), `waveshare/qmi8658` |
 | Touch | tap to throw a bomb, hold to reveal patrol routes, menus | [`touch.c`](main/touch.c) |
 | ES8311 + speaker | alarm, heartbeat, music, effects — all synthesised live | [`audio.c`](main/audio.c), [`synth.c`](main/synth.c), `espressif/esp_codec_dev` |
 | BOOT button | pause menu, on every screen | [`button.c`](main/button.c) |
@@ -360,7 +360,8 @@ main/
   main.c        init and the frame loop: banded rendering, events -> sound
   board.c       panel bring-up, revision detect, IO expander
   touch.c       unified FT3168 / CST816 driver
-  imu.c         QMI8658 tilt, filtering, levelling
+  imu.c         QMI8658 bring-up and sampling
+  tilt.c        portable tilt filtering, levelling, response curve
   audio.c       ES8311 + I2S bring-up (thin platform shim)
   button.c      debounced BOOT button
   scores.c      initials and per-stage records in NVS
@@ -384,6 +385,7 @@ tools/
     routecheck.c       patrol-route overlay regression checks
     smoke.c            loads and simulates all 100 stages
     soak.c             long-run numerical soak
+    tilttest.c         tilt filtering and levelling
     preview.c          renders real frames without a flash cycle
     legend.c           renders docs/legend.png
     synthwav.c         renders the real synth to a WAV
@@ -391,8 +393,8 @@ tools/
 
 ## Testing without hardware
 
-The game core — `game.c`, `guard.c`, `gfx.c`, `render.c`, `hud.c`, `level*.c`
-and `synth.c` — has no ESP-IDF dependencies. Platform code passes data *in*
+The game core — `game.c`, `guard.c`, `gfx.c`, `render.c`, `hud.c`, `level*.c`,
+`synth.c` and `tilt.c` — has no ESP-IDF dependencies. Platform code passes data *in*
 (tilt, touch, button) rather than the core calling *out*, so the same sources
 compile natively against a stub `esp_err.h` in `tools/host/`. That is what
 makes the whole test suite possible without a board:
@@ -422,6 +424,9 @@ It runs, and exits non-zero if any fail:
   minutes of audio, checking for NaN, infinities and out-of-bounds positions —
   the kind of accumulated float drift that only appears in a long session and
   never in a short test.
+- **`tilttest.c`** — that a board held still never moves the player, at any
+  attitude it was powered on in, with or without hand tremor; that a real lean
+  still reads as full tilt; and that a dead sensor decays to neutral.
 
 The harnesses also render. This produces real frames from the real code
 without a flash cycle:

@@ -23,15 +23,16 @@ python3 tools/gen_levels.py      # regenerate the 100 stages
 ```
 
 **`./tools/check.sh` is the main safety net and needs no board.** It compiles
-the game's own C sources natively and runs four suites: level validation, input
-and menu geometry, patrol-route rendering, and a numerical soak. Run it before
-every commit. It exits non-zero on failure.
+the game's own C sources natively and runs six suites: level validation, input
+and menu geometry, patrol-route rendering, a stage smoke test, a numerical soak,
+and tilt filtering. Run it before every commit. It exits non-zero on failure.
 
 ## Layout
 
 | | |
 |---|---|
 | `main/board.c` `touch.c` `imu.c` `audio.c` `button.c` `scores.c` | hardware: panel, touch, IMU, codec, button, NVS |
+| `main/tilt.c` | portable tilt filtering and levelling, fed by `imu.c` |
 | `main/game.c` `guard.c` `level.c` `level_gen.c` | simulation and stage data |
 | `main/gfx.c` `font.c` `render.c` `hud.c` `synth.c` | rasteriser, drawing, sound |
 | `main/main.c` | init and the frame loop |
@@ -39,7 +40,7 @@ every commit. It exits non-zero on failure.
 | `tools/gen_levels.py` | the stage generator |
 
 **The game core is deliberately free of ESP dependencies.** `game.c`, `guard.c`,
-`gfx.c`, `render.c`, `hud.c`, `level*.c` and `synth.c` all compile natively
+`gfx.c`, `render.c`, `hud.c`, `level*.c`, `synth.c` and `tilt.c` all compile natively
 against a three-line `esp_err.h` stub in `tools/host/`. That is what makes the
 whole test suite possible without hardware — keep it that way. Platform code
 passes data *in* (tilt, touch, button) rather than being called *out* to.

@@ -4,6 +4,7 @@ idf_component_register(
         "board.c"
         "touch.c"
         "imu.c"
+        "tilt.c"
         "button.c"
         "scores.c"
         "audio.c"
