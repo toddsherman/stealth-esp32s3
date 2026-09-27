@@ -178,7 +178,7 @@ int main(int argc, char **argv)
 
     reset_inputs();
     // --- level 6: the busiest board ---
-    game_load_level(&g, g_level_count - 1);
+    game_load_level(&g, level_count() - 1);
     tap(&g, 184, 300);
     sim(&g, 3.0f, NULL);
     render_to_fb(&g);
@@ -187,7 +187,7 @@ int main(int argc, char **argv)
 
     reset_inputs();
     // --- routes revealed on the busiest board, where they actually wind ---
-    game_load_level(&g, g_level_count - 1);
+    game_load_level(&g, level_count() - 1);
     tap(&g, 184, 300);
     sim(&g, 1.2f, NULL);
     {
@@ -322,7 +322,7 @@ int main(int argc, char **argv)
 
     // --- report simulated state, so the harness doubles as a smoke test ---
     printf("levels=%d  final: phase=%d level=%d guards=%d hostages=%d bombs=%d\n",
-           g_level_count, (int)g.phase, g.level_idx + 1, g.guard_count,
+           level_count(), (int)g.phase, g.level_idx + 1, g.guard_count,
            g.hostage_count, g.bombs_left);
     for (int i = 0; i < g.guard_count; i++) {
         printf("  guard %d: pos=(%.0f,%.0f) mode=%d alert=%.2f\n",
