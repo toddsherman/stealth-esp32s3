@@ -12,3 +12,9 @@ managed_components/
 *.wav
 
 .DS_Store
+
+# tools/tiltvideo: dependencies and per-run renders
+tools/tiltvideo/node_modules/
+tools/tiltvideo/work/
+tools/tiltvideo/package-lock.json
+stealth-tilt.mp4

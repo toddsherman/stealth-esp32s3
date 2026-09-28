@@ -11,6 +11,10 @@
 //
 //   capture search FIRST LAST        headless: try stages, print how each went
 //   capture record STAGE OUTDIR      frames as PPM + audio.wav + trace.csv
+//
+// trace.csv carries, per saved frame, the tilt and touch the autopilot applied
+// and the events that fired. tools/tiltvideo replays that tilt on a 3D model
+// of the board, which is how the tilting-board video was made.
 //   capture title OUT.ppm            the title card
 //
 // Build, then encode (nearest-neighbour 2x keeps the hairlines crisp):
@@ -41,6 +45,13 @@
 static uint16_t fb[W * H];
 static game_t g;
 static touch_state_t ts;
+
+// What the "hand" did on the most recent step, and every event since the last
+// saved frame - logged so a render of the physical board can replay the tilt.
+static float    s_mx, s_my;
+static bool     s_finger;
+static int      s_fx, s_fy;
+static uint32_t s_events;
 
 // ---- output ---------------------------------------------------------------
 static void write_ppm(const char *path)
@@ -125,6 +136,8 @@ static void step(float mx, float my, bool finger, int fx, int fy)
     game_input_t in;
     hud_build_input(&in, &ts, mx, my, false, &g, DT);
     game_update(&g, DT, &in);
+    s_mx = mx; s_my = my; s_finger = finger; s_fx = fx; s_fy = fy;
+    s_events |= g.events;
     audio_step();
 }
 
@@ -299,14 +312,15 @@ static void save_frame(void)
     if (!tr) {
         snprintf(path, sizeof(path), "%s/trace.csv", s_dir);
         tr = fopen(path, "w");
-        fprintf(tr, "frame,phase,t,alert,reveal,bomb_flying,ring,rescued,exit_anim,detecting\n");
+        fprintf(tr, "frame,phase,t,alert,reveal,bomb_flying,ring,rescued,exit_anim,detecting,mx,my,finger,fx,fy,events\n");
     }
     int det = 0;
     for (int i = 0; i < g.guard_count; i++) det += g.guards[i].detecting;
-    fprintf(tr, "%d,%d,%.2f,%.3f,%d,%d,%.1f,%d,%.2f,%d\n", s_frame, (int)g.phase, (double)g.level_time,
+    fprintf(tr, "%d,%d,%.2f,%.3f,%d,%d,%.1f,%d,%.2f,%d,%.3f,%.3f,%d,%d,%d,%u\n", s_frame, (int)g.phase, (double)g.level_time,
             (double)g.max_alert, g.reveal_paths, g.bomb.active && g.bomb.flying,
             (double)(g.bomb.active && !g.bomb.flying ? g.bomb.ring : 0.0f), g.rescued,
-            (double)g.exit_anim, det);
+            (double)g.exit_anim, det, (double)s_mx, (double)s_my, s_finger, s_fx, s_fy, (unsigned)s_events);
+    s_events = 0;
     fflush(tr);
     s_frame++;
 }

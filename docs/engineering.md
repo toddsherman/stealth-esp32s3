@@ -390,6 +390,7 @@ tools/
     tilttest.c         tilt filtering and levelling
     preview.c          renders real frames without a flash cycle
     capture.c          an autopilot run of any stage, as frames plus audio
+  tiltvideo/           the tilting-board video: a 3D model replaying a run
     legend.c           renders docs/legend.png
     synthwav.c         renders the real synth to a WAV
 ```
@@ -441,9 +442,16 @@ clang -O2 -std=c11 -I main -I tools/host tools/host/preview.c \
 ```
 
 `tools/host/capture.c` goes further: an autopilot plays a whole stage and the
-recorder writes every frame plus the synth's audio for the same run, which is
-how the gameplay video on [todd.sh/StealthGame](https://www.todd.sh/StealthGame)
-was made. Its header has the build and encode commands.
+recorder writes every frame, the synth's audio, and the tilt and touch it
+applied on each frame. `tools/tiltvideo` replays that run on a 3D model of the
+board (three.js, rendered frame by frame in headless Chrome): the screen shows
+the game's own frames and the board leans by the recorded tilt. That is the
+video on [todd.sh/StealthGame](https://www.todd.sh/StealthGame), and one
+command rebuilds it bit for bit:
+
+```bash
+./tools/tiltvideo/make.sh 100 stealth-tilt.mp4   # needs ffmpeg, node, Chrome
+```
 
 And this renders the exact code driving the speaker to a WAV, which is how the
 speaker-passband work above was measured without a speaker in hand:

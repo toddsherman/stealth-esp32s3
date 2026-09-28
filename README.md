@@ -14,15 +14,16 @@ ESP32-S3 board. No game engine or audio samples.
 
 <p align="center">
   <a href="https://www.todd.sh/StealthGame">
-    <img src="docs/gameplay.gif" width="276" height="336" alt="Stealth Game: a player moving through a maze while guards sweep vision cones and sound bombs draw them away">
+    <img src="docs/gameplay.gif" width="360" height="450" alt="Stealth Game: a 3D model of the board tilting as it plays stage 100, the player slipping past guards, throwing sound bombs and freeing hostages">
   </a>
 </p>
 
 <p align="center"><a href="https://www.todd.sh/StealthGame"><strong>Watch the full run with sound →</strong></a></p>
 
 The animation is stage 100 played by an autopilot through the actual C game
-code, compiled on a computer. It is a renderer capture, not camera footage of
-the board. [How the recorder works](tools/host/capture.c).
+code, compiled on a computer. A 3D model of the board leans by the tilt the
+autopilot applied on each frame, while its screen shows the game's own frames.
+It is a render, not camera footage. [How it was made](docs/gameplay.md).
 
 [Quick start](#quick-start) · [Hardware](#hardware) · [Controls](#controls) ·
 [Code to explore](#code-to-explore) · [Engineering notes](docs/engineering.md) ·
